@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Pickup UI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Define custom color variables */
+        :root {
+            --bg-main: #F0EFE9;
+            --primary-dark: #003C3C;
+            --primary-darkest: #0D2021;
+            
+            /* State Colors */
+            --color-waiting-bg: #D1D5DB;      /* Grey */
+            --color-waiting-border: #6B7280;  /* Darker Grey */
+            --color-selected-bg: #3B82F6;     /* Blue */
+            --color-selected-border: #1D4ED8; /* Darker Blue */
+            --color-finished-bg: #01DC82;     /* Green */
+            --color-finished-border: #003C3C; /* Dark Teal */
+            --color-inactive-bg: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--primary-darkest);
+        }
+        
+        /* --- Compartment Item States --- */
+        .selectable-item { display: flex; align-items: center; justify-content: center; }
+        .item-inactive { background-color: var(--color-inactive-bg); }
+        .item-waiting { background-color: var(--color-waiting-bg) !important; border: 2px dashed var(--color-waiting-border) !important; }
+        .item-selected { background-color: var(--color-selected-bg) !important; border: 2px solid var(--color-selected-border) !important; }
+        .item-finished { background-color: var(--color-finished-bg) !important; border: 2px solid var(--color-finished-border) !important; }
+
+        /* Icon Visibility */
+        .selectable-item .icon { display: none; width: 40%; height: 40%; }
+        .item-finished .icon-finished { display: block; color: var(--primary-dark); }
+
+        /* --- Bin Location Border States --- */
+        .bin-location { border-width: 2px; }
+        .border-waiting { border-color: #6B7280; /* Dark Grey */ }
+        .border-selected { border-color: #3B82F6; /* Blue */ }
+        .border-finished { border-color: #01DC82; /* Green */ }
+
+        /* General Styles */
+        .nav-link { color: var(--primary-dark); }
+        .nav-link:hover { color: var(--primary-darkest); background-color: #e5e7eb; }
+        .nav-link-active { background-color: var(--primary-dark); color: white; }
+
+        /* Modal Styles */
+        #pickup-modal .disabled-button {
+            background-color: #9CA3AF;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="root" class="flex flex-col h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 shadow-sm">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center space-x-8">
+                        <img src="http://googleusercontent.com/file_content/1" alt="Cartesian Kinetics Logo" class="h-10">
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="#" class="px-3 py-2 text-sm font-semibold rounded-md nav-link-active">Order Fulfillment</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md nav-link">Inbounds</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md nav-link">Replenishment</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md nav-link">Cycle Count</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right text-xs text-primary-dark">
+                            <div>03:18 PM Fri 2025</div>
+                            <div>John Doe</div>
+                        </div>
+                        <a href="#" class="cursor-pointer">
+                            <img src="https://placehold.co/40x40/EFEFEF/333333?text=JD" alt="User Avatar" class="w-10 h-10 rounded-full"
+                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/EFEFEF/333333?text=JD';">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border-t border-gray-200">
+                <div class="container mx-auto px-4 py-2 flex items-center">
+                    <span class="text-sm font-medium text-primary-dark">Order ID: EX193809-4</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow p-4 md:p-6">
+            <div class="container mx-auto">
+                <h2 class="text-lg font-semibold text-primary-darkest mb-4">Pickup Items</h2>
+                <div id="bins-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-4">
+                    <!-- Bins will be dynamically populated by the script -->
+                </div>
+                 <!-- Done Button moved here -->
+                <div class="mt-8 flex justify-end">
+                    <button id="main-done-btn" class="px-8 py-3 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed" disabled>Done</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Dialog -->
+    <div id="pickup-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div class="p-6 grid grid-cols-2 gap-6">
+                <!-- Left Column: Images -->
+                <div class="space-y-4">
+                    <div id="modal-compartment-view" class="bg-gray-100 rounded-lg aspect-square flex items-center justify-center p-4">
+                        <!-- Compartment visualization will be injected here -->
+                    </div>
+                    <div>
+                        <img id="modal-sku-image" src="" alt="SKU Image" class="rounded-lg w-full aspect-square object-cover">
+                    </div>
+                </div>
+
+                <!-- Right Column: Details & Actions -->
+                <div class="flex flex-col space-y-4">
+                    <div>
+                        <h3 id="modal-item-name" class="text-2xl font-bold text-gray-800"></h3>
+                        <p class="text-sm text-gray-500 font-semibold">Partition: <span id="modal-partition-number"></span></p>
+                        <p class="text-sm text-gray-500">Order ID: <span id="modal-order-id"></span></p>
+                        <p class="text-sm text-gray-500">SKU ID: <span id="modal-sku-id"></span></p>
+                    </div>
+                    
+                    <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-center">
+                        <p class="text-sm font-medium text-blue-800">PICKUP QUANTITY</p>
+                        <div class="flex items-center justify-center space-x-4 mt-2">
+                            <button id="modal-minus-btn" class="bg-blue-200 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center text-lg font-bold">-</button>
+                            <p id="modal-quantity-counter" class="text-3xl font-bold text-blue-900 w-24"></p>
+                            <button id="modal-plus-btn" class="bg-blue-200 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center text-lg font-bold">+</button>
+                        </div>
+                    </div>
+
+                    <div class="flex-grow"></div>
+
+                    <div class="space-y-2">
+                         <button id="modal-flag-btn" class="w-full text-center py-3 px-4 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200">Flag SKU</button>
+                         <button id="modal-done-btn" class="w-full text-center py-3 px-4 bg-gray-400 text-white font-semibold rounded-lg" disabled>Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const binsGrid = document.getElementById('bins-grid');
+            const modal = document.getElementById('pickup-modal');
+            let currentSelectedItem = null;
+
+            const binData = [
+                { id: '1.1.1.', type: 'empty' },
+                { id: '2.1.1.', type: '2-compartment', active: [0] },
+                { id: '3.1.1.', type: '1-compartment', active: [0] },
+                { id: '4.1.1.', type: '4-compartment', active: [0, 1, 2, 3] },
+                { id: '5.1.1.', type: '1-compartment', active: [0], initialState: 'selected' },
+                { id: '6.1.1.', type: 'empty' },
+                { id: '7.1.1.', type: '2-compartment', active: [0, 1] },
+                { id: '8.1.1.', type: 'empty' },
+                { id: '9.1.1.', type: '1-compartment', active: [0], initialState: 'finished' },
+                { id: '10.1.1.', type: 'empty' },
+                { id: '11.1.1.', type: '4-compartment', active: [1, 2] },
+                { id: '12.1.1.', type: 'empty' },
+            ];
+            
+            function getIconSvg() {
+                return `<svg class="icon icon-finished" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+            }
+
+            function updateBinState(binLocation) {
+                if (!binLocation) return;
+                const compartments = binLocation.querySelectorAll('.selectable-item');
+                const isSelected = binLocation.querySelector('.item-selected');
+                const finishedItems = binLocation.querySelectorAll('.item-finished');
+                
+                let borderClass = 'border-waiting';
+                if (isSelected) {
+                    borderClass = 'border-selected';
+                } else if (compartments.length > 0 && compartments.length === finishedItems.length) {
+                    borderClass = 'border-finished';
+                }
+                
+                binLocation.classList.remove('border-waiting', 'border-selected', 'border-finished');
+                binLocation.classList.add(borderClass);
+            }
+
+            // --- NEW: Function to check if all tasks are done ---
+            function checkAllTasksFinished() {
+                const allSelectableItems = document.querySelectorAll('.selectable-item');
+                const allFinishedItems = document.querySelectorAll('.item-finished');
+                const mainDoneBtn = document.getElementById('main-done-btn');
+
+                if (allSelectableItems.length > 0 && allSelectableItems.length === allFinishedItems.length) {
+                    mainDoneBtn.disabled = false;
+                    mainDoneBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    mainDoneBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                } else {
+                    mainDoneBtn.disabled = true;
+                    mainDoneBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    mainDoneBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                }
+            }
+
+            function openPickupModal(item) {
+                currentSelectedItem = item;
+                const parentBin = item.closest('.bin-location');
+                const binGrid = parentBin.querySelector('.grid');
+
+                let partitionNumber = 'N/A';
+                if (binGrid) {
+                    const allCompartments = Array.from(binGrid.children);
+                    const totalCompartments = allCompartments.length;
+                    const selectedIndex = allCompartments.indexOf(item);
+
+                    if (totalCompartments === 2) {
+                        const partitionMap = [2, 1];
+                        partitionNumber = partitionMap[selectedIndex];
+                    } else if (totalCompartments === 4) {
+                        const partitionMap = [2, 1, 3, 4];
+                        partitionNumber = partitionMap[selectedIndex];
+                    }
+                }
+                document.getElementById('modal-partition-number').textContent = partitionNumber;
+
+                const pickupQty = Math.floor(Math.random() * 12) + 1;
+                const randomSkuNum = Math.floor(Math.random() * 100) + 1;
+                document.getElementById('modal-item-name').textContent = `Industrial Widget ${randomSkuNum}`;
+                document.getElementById('modal-sku-image').src = `https://placehold.co/400x400/cccccc/333333?text=SKU-${randomSkuNum}`;
+                document.getElementById('modal-order-id').textContent = `ORD-${Math.random().toString(36).slice(2, 11).toUpperCase()}`;
+                document.getElementById('modal-sku-id').textContent = `SKU-${Math.random().toString(36).slice(2, 11).toUpperCase()}`;
+                
+                const compartmentView = document.getElementById('modal-compartment-view');
+                if (binGrid) {
+                    const binGridClone = binGrid.cloneNode(true);
+                    binGridClone.classList.add('h-full');
+                    const allOriginalItems = binGrid.children;
+                    const selectedIndex = Array.from(allOriginalItems).indexOf(item);
+                    
+                    Array.from(binGridClone.children).forEach((clone, index) => {
+                        clone.className = 'rounded-md item-inactive';
+                        if (index === selectedIndex) {
+                            clone.className = 'rounded-md !bg-blue-500 ring-4 ring-blue-300';
+                        }
+                    });
+                    
+                    compartmentView.innerHTML = '';
+                    compartmentView.appendChild(binGridClone);
+                }
+
+                let currentCount = 0;
+                const counterDisplay = document.getElementById('modal-quantity-counter');
+                const plusBtn = document.getElementById('modal-plus-btn');
+                const minusBtn = document.getElementById('modal-minus-btn');
+                const doneBtn = document.getElementById('modal-done-btn');
+
+                const updateCounter = () => {
+                    counterDisplay.textContent = `${currentCount}/${pickupQty}`;
+                    const isDone = currentCount === pickupQty;
+                    doneBtn.disabled = !isDone;
+                    doneBtn.classList.toggle('disabled-button', !isDone);
+                    doneBtn.classList.toggle('bg-gray-400', !isDone);
+                    doneBtn.classList.toggle('bg-green-500', isDone);
+                };
+
+                plusBtn.onclick = () => { if (currentCount < pickupQty) { currentCount++; updateCounter(); } };
+                minusBtn.onclick = () => { if (currentCount > 0) { currentCount--; updateCounter(); } };
+                doneBtn.onclick = () => { if (currentCount === pickupQty) finishItemSelection(); };
+
+                updateCounter();
+                modal.classList.remove('hidden');
+            }
+
+            function closeModal() {
+                if (currentSelectedItem) {
+                    currentSelectedItem.classList.remove('item-selected');
+                    currentSelectedItem.classList.add('item-waiting');
+                    updateBinState(currentSelectedItem.closest('.bin-location'));
+                    currentSelectedItem = null;
+                }
+                modal.classList.add('hidden');
+            }
+            
+            function finishItemSelection() {
+                if (!currentSelectedItem) return;
+                currentSelectedItem.classList.remove('item-selected');
+                currentSelectedItem.classList.add('item-finished');
+                currentSelectedItem.innerHTML = getIconSvg();
+                const parentBin = currentSelectedItem.closest('.bin-location');
+                currentSelectedItem = null;
+                modal.classList.add('hidden');
+                updateBinState(parentBin);
+                checkAllTasksFinished(); // Check if all tasks are done
+            }
+
+            function initializeApp() {
+                binsGrid.innerHTML = '';
+                let hasSetInitialSelected = false;
+
+                binData.forEach(data => {
+                    const binWrapper = document.createElement('div');
+                    if (data.type === 'empty') {
+                        binWrapper.className = 'bg-white border border-gray-300 rounded-lg p-3 flex flex-col aspect-[2/4]';
+                        binWrapper.innerHTML = `<div class="flex-grow"></div>`;
+                    } else {
+                        binWrapper.className = 'bin-location bg-white rounded-lg p-1 flex flex-col aspect-[2/4] border-waiting';
+                        let gridClass = '', compartmentCount = 0, compartmentsHtml = '';
+                        if (data.type === '1-compartment') { gridClass = 'grid-cols-1 grid-rows-1'; compartmentCount = 1; }
+                        if (data.type === '2-compartment') { gridClass = 'grid-cols-2 grid-rows-1'; compartmentCount = 2; }
+                        if (data.type === '4-compartment') { gridClass = 'grid-cols-2 grid-rows-2'; compartmentCount = 4; }
+                        
+                        for (let i = 0; i < compartmentCount; i++) {
+                            if (data.active.includes(i)) {
+                                let stateClass = 'item-waiting';
+                                if (data.initialState === 'selected' && !hasSetInitialSelected) {
+                                    stateClass = 'item-selected';
+                                    hasSetInitialSelected = true;
+                                }
+                                if (data.initialState === 'finished') stateClass = 'item-finished';
+                                compartmentsHtml += `<div class="rounded-md cursor-pointer transition-colors selectable-item ${stateClass}">${stateClass === 'item-finished' ? getIconSvg() : ''}</div>`;
+                            } else {
+                                compartmentsHtml += `<div class="rounded-md item-inactive"></div>`;
+                            }
+                        }
+                        binWrapper.innerHTML = `<div class="flex-grow grid ${gridClass} gap-1">${compartmentsHtml}</div>`;
+                    }
+                    binWrapper.innerHTML += `<p class="text-xs text-center text-primary-dark mt-2">Bin Location:<br>${data.id}</p>`;
+                    binsGrid.appendChild(binWrapper);
+                    if (data.type !== 'empty') updateBinState(binWrapper);
+                });
+
+                document.querySelectorAll('.selectable-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        if (item.classList.contains('item-finished') || item === currentSelectedItem) {
+                            return;
+                        }
+
+                        if(currentSelectedItem) {
+                           closeModal();
+                        }
+                        
+                        const previouslySelected = document.querySelector('.item-selected');
+                        if (previouslySelected) {
+                            previouslySelected.classList.remove('item-selected');
+                            previouslySelected.classList.add('item-waiting');
+                            updateBinState(previouslySelected.closest('.bin-location'));
+                        }
+
+                        item.classList.remove('item-waiting');
+                        item.classList.add('item-selected');
+                        updateBinState(item.closest('.bin-location'));
+                        openPickupModal(item);
+                    });
+                });
+                
+                checkAllTasksFinished(); // Initial check on load
+            }
+
+            modal.addEventListener('click', e => { if (e.target.id === 'pickup-modal') closeModal(); });
+
+            initializeApp();
+        });
+    </script>
+
+</body>
+</html>
