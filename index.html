@@ -159,9 +159,6 @@
                 <div id="bins-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-4">
                     <!-- Bins populated by JS -->
                 </div>
-                <div class="mt-8 flex justify-end">
-                    <button id="main-done-btn" class="px-8 py-3 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed transition-all" disabled>Complete Wave</button>
-                </div>
             </div>
         </main>
     </div>
@@ -199,7 +196,7 @@
                         <h3 id="modal-item-name" class="text-3xl font-bold text-gray-800">Industrial Widget</h3>
                         <p class="text-sm text-gray-500 font-semibold mt-2">Partition: <span id="modal-partition-number"></span></p>
                         <p class="text-sm text-gray-500 flex items-center">Order ID: 
-                            <span id="modal-order-dot" class="inline-block w-4 h-4 rounded-sm mx-2"></span>
+                            <span id="modal-order-dot" class="inline-block w-4 h-4 rounded-sm mx-2 border"></span>
                             <span id="modal-order-id" class="font-bold"></span>
                         </p>
                         <p class="text-sm text-gray-500 font-medium">SKU ID: <span id="modal-sku-id" class="font-mono"></span></p>
@@ -289,7 +286,6 @@
             const mainModal = document.getElementById('pickup-modal');
             const mappingModal = document.getElementById('mapping-modal');
             const orderLegend = document.getElementById('order-legend');
-            const mainDoneBtn = document.getElementById('main-done-btn');
             const dateTimeElement = document.getElementById('date-time');
             const mappingGrid = document.getElementById('mapping-grid');
             const submitMappingBtn = document.getElementById('submit-mapping-btn');
@@ -352,17 +348,40 @@
                     binData.push(bin);
                 }
 
+                // BUG FIX: Ensure every order in the wave has AT LEAST ONE item
+                allOrdersInWave.forEach(oid => {
+                    if (orderMetadata[oid].items === 0) {
+                        // Pick a random bin that isn't empty and add it
+                        const nonEmptyBins = binData.filter(b => b.type !== 'empty');
+                        const randomBin = nonEmptyBins[Math.floor(Math.random() * nonEmptyBins.length)];
+                        const randomSlot = Math.floor(Math.random() * randomBin.items.length);
+                        
+                        // Replace an existing item slot with this order to guarantee it exists
+                        if (randomBin.items.length > 0) {
+                            randomBin.items[randomSlot].orderId = oid;
+                        } else {
+                            // If somehow empty, just force a 1-compartment change
+                            randomBin.type = '1-compartment';
+                            randomBin.items = [{ compartment: 0, orderId: oid }];
+                        }
+                        orderMetadata[oid].items = 1;
+                    }
+                });
+
                 startNextBatch();
             }
 
             // --- BATCH WORKFLOW ---
             function startNextBatch() {
+                // Get next 4 orders that don't have a Tote ID yet
                 activeBatchOids = allOrdersInWave
-                    .filter(oid => !orderMetadata[oid].completed && !orderMetadata[oid].toteId)
+                    .filter(oid => !orderMetadata[oid].toteId)
                     .slice(0, 4);
 
                 if (activeBatchOids.length === 0) {
-                    checkWaveCompletion(true);
+                    // Entire Wave Finished
+                    showAnimation('completion-animation', 'Wave Fully Archived');
+                    setTimeout(generateWave, 2500);
                     return;
                 }
 
@@ -454,12 +473,15 @@
                                 
                                 let stateClass = 'item-waiting';
                                 if (!isInBatch) stateClass = 'item-not-in-batch';
-                                if (order.completed) stateClass = 'item-finished';
+                                
+                                // Check if this specific item slot in this bin was already picked
+                                const isItemFinished = item.isFinished || order.completed;
+                                if (isItemFinished) stateClass = 'item-finished';
 
                                 html += `<div class="selectable-item rounded-lg ${stateClass} ${isInBatch ? order.colorClass : ''}" 
                                             data-oid="${item.orderId}" data-bin="${bin.id}" data-slot="${s}"
                                             onclick="handleItemClick(this)">
-                                            <div class="icon-finished hidden"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" /></svg></div>
+                                            <div class="icon-finished ${stateClass === 'item-finished' ? '' : 'hidden'}"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" /></svg></div>
                                          </div>`;
                             } else {
                                 html += `<div class="rounded-lg item-inactive"></div>`;
@@ -504,8 +526,8 @@
                 const oid = node.dataset.oid;
                 const order = orderMetadata[oid];
 
-                targetQty = Math.floor(Math.random() * 8) + 1;
-                // DEFAULT AS EQUALS on both sides of "/"
+                // If items is 1, target is 1. If more, random up to 8.
+                targetQty = order.items === 1 ? 1 : Math.floor(Math.random() * 8) + 1;
                 modalQty = targetQty; 
                 confirmedTote = false;
                 
@@ -519,7 +541,7 @@
                 const allSlots = Array.from(binEl.querySelectorAll('.selectable-item, .item-inactive, .rounded-lg:not(.selectable-item)'));
                 document.getElementById('modal-partition-number').textContent = allSlots.indexOf(node) + 1;
 
-                // Mini View - Solid color block coordination + DASHED border (as per image_5c745c)
+                // Mini View
                 const miniView = document.getElementById('modal-compartment-view');
                 miniView.style.borderColor = `var(--${order.colorClass}-border)`;
                 miniView.innerHTML = binEl.querySelector('.grid').outerHTML;
@@ -532,17 +554,15 @@
                 Array.from(miniSlots).forEach((cl, i) => {
                     const originalSlot = allSlots[i];
                     if (originalSlot === node) {
-                        // ACTIVE COMPARTMENT: Solid block color + dark dashed border
                         cl.className = `rounded-lg flex items-center justify-center transition-all modal-active-compartment ${order.colorClass}`;
                         cl.innerHTML = "";
                     } else {
-                        // INACTIVE COMPARTMENT: Clean white/gray
                         cl.className = `rounded-lg bg-white border border-gray-100`;
                         cl.innerHTML = "";
                     }
                 });
 
-                // Tote Wall - Display TOTE IDs as per image_5c7498
+                // Tote Wall
                 const totes = document.querySelectorAll('.order-tote');
                 totes.forEach((t, i) => {
                     const locId = i + 1;
@@ -563,7 +583,6 @@
                     t.onclick = () => {
                         if (assignedBatchOrder === oid) {
                             confirmedTote = !confirmedTote;
-                            // SELECTED Cue for Put wall pane as per image_5c7b81
                             t.classList.toggle('tote-confirmed', confirmedTote);
                             updateModalButtons();
                         }
@@ -596,7 +615,15 @@
             document.getElementById('modal-done-btn').onclick = () => {
                 const oid = currentItemNode.dataset.oid;
                 const order = orderMetadata[oid];
+                const binId = currentItemNode.dataset.bin;
+                const slotIndex = parseInt(currentItemNode.dataset.slot);
+
                 order.picked++;
+
+                // Mark the logical item in binData as finished
+                const bin = binData.find(b => b.id === binId);
+                const itemEntry = bin.items.find(i => i.compartment === slotIndex);
+                itemEntry.isFinished = true;
 
                 currentItemNode.classList.remove('item-selected', 'item-waiting');
                 currentItemNode.classList.add('item-finished');
@@ -638,20 +665,12 @@
             }
 
             function checkBatchCompletion() {
+                // Check if all orders in the current active batch are completed
                 const batchDone = activeBatchOids.every(oid => orderMetadata[oid].completed);
                 if (batchDone) {
                     showAnimation('batch-complete-animation');
+                    // Automatically proceed to the next mapping batch
                     setTimeout(startNextBatch, 2500);
-                }
-            }
-
-            function checkWaveCompletion(isDone) {
-                if (isDone) {
-                    mainDoneBtn.disabled = false;
-                    mainDoneBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                    mainDoneBtn.classList.add('bg-green-600', 'hover:bg-green-700', 'shadow-lg');
-                    document.getElementById('mapping-status').textContent = 'Wave Finished';
-                    document.getElementById('mapping-status').className = "bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider";
                 }
             }
 
@@ -665,11 +684,6 @@
                     el.classList.add('hidden');
                 }, 2400);
             }
-
-            mainDoneBtn.onclick = () => {
-                showAnimation('batch-complete-animation', 'Wave Archive Successful');
-                setTimeout(generateWave, 2500);
-            };
 
             generateWave();
         });
