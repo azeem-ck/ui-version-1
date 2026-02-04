@@ -1,360 +1,678 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Warehouse Bin Decommissioning UI</title>
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- Google Fonts: Inter -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-/* Define custom color variables */
-:root {
---bg-main: #F0EFE9;
---primary-dark: #003C3C;
---primary-darkest: #0D2021;
---color-inactive-bg: #e5e7eb;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Order Fulfillment | Cartesian Kinetics</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-main: #F0EFE9;
+            --primary-dark: #003C3C;
+            --primary-darkest: #0D2021;
+            
+            /* State Colors */
+            --color-waiting-bg: #D1D5DB;
+            --color-waiting-border: #6B7280;
+            --color-selected-bg: #3B82F6;
+            --color-selected-border: #1D4ED8;
+            --color-finished-bg: #01DC82;
+            --color-finished-border: #003C3C;
+            --color-inactive-bg: #e5e7eb;
 
-/* Order-specific Colors (used for visual differentiation of SKUs in bins) */
---order-1-bg: #FEF3C7; /* Amber 100 */
---order-2-bg: #DBEAFE; /* Blue 200 */
---order-3-bg: #FCE7F3; /* Pink 100 */
-}
+            /* Order-specific Colors */
+            --order-1-bg: #FEF3C7; --order-1-border: #FBBF24;
+            --order-2-bg: #DBEAFE; --order-2-border: #60A5FA;
+            --order-3-bg: #FCE7F3; --order-3-border: #F472B6;
+            --order-4-bg: #DCFCE7; --order-4-border: #4ADE80;
+        }
 
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--bg-main);
-    color: var(--primary-darkest);
-}
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--primary-darkest);
+        }
+        
+        /* --- Compartment Item States --- */
+        .selectable-item { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .item-inactive { background-color: var(--color-inactive-bg); opacity: 0.4; cursor: not-allowed; }
+        .item-not-in-batch { background-color: #f3f4f6; border: 1px solid #e5e7eb; opacity: 0.3; cursor: not-allowed; }
+        
+        .item-waiting { border: 2px dashed var(--color-waiting-border) !important; }
+        .item-selected { 
+            border: 4px solid var(--color-selected-border) !important; 
+            transform: scale(1.02);
+            z-index: 10;
+        }
+        .item-finished { 
+            background-color: var(--color-finished-bg) !important; 
+            border: 2px solid var(--color-finished-border) !important; 
+        }
 
-/* --- Compartment Item Styling --- */
-.item-inactive { background-color: var(--color-inactive-bg); }
-.order-1 { background-color: var(--order-1-bg); }
-.order-2 { background-color: var(--order-2-bg); }
-.order-3 { background-color: var(--order-3-bg); }
+        /* Order Colors */
+        .order-1 { background-color: var(--order-1-bg); }
+        .order-2 { background-color: var(--order-2-bg); }
+        .order-3 { background-color: var(--order-3-bg); }
+        .order-4 { background-color: var(--order-4-bg); }
 
+        .selectable-item .icon { display: none; width: 40%; height: 40%; }
+        .item-finished .icon-finished { display: block; color: var(--primary-dark); }
 
-/* --- Bin Location Styling --- */
-.bin-location {
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-.bin-location:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-}
+        /* Bin Borders */
+        .bin-location { border-width: 2px; transition: border-color 0.3s; border-radius: 12px; }
+        .border-waiting { border-color: #D1D5DB; }
+        .border-finished { border-color: #01DC82; }
 
-/* General Styles */
-.nav-link { color: var(--primary-dark); }
-.nav-link:hover { color: var(--primary-darkest); background-color: #e5e7eb; }
-.nav-link-active { background-color: var(--primary-dark); color: white; }
+        .nav-link-active { background-color: var(--primary-dark); color: white; }
 
-/* --- Decommission Animation --- */
-.animated-arrow {
-    animation: move-arrow 1.5s ease-in-out infinite;
-}
+        /* Tote Highlight */
+        .tote-highlight { animation: pulse-border 1.5s infinite; border-width: 4px !important; }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
 
-@keyframes move-arrow {
-    0%, 100% {
-        transform: translateX(0);
-        opacity: 0.8;
-    }
-    50% {
-        transform: translateX(15px);
-        opacity: 1;
-    }
-}
-</style>
+        /* DASH for Active Compartment in Modal as per image_5c745c */
+        .modal-active-compartment {
+            border: 4px dashed #475569 !important; /* Thick Dark Gray Dash */
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* SELECTED cue for Put Wall Location as per image_5c7b81 */
+        .tote-confirmed {
+            outline: 6px solid #93C5FD !important; /* Light blue thick glow */
+            outline-offset: -2px;
+            transform: scale(0.98);
+        }
+
+        .animation-popup.show { display: flex; animation: fade-in-out 2.5s ease-in-out forwards; }
+        @keyframes fade-in-out {
+            0% { opacity: 0; transform: scale(0.8); }
+            20% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.8); }
+        }
+    </style>
 </head>
-<body class="antialiased">
+<body class="antialiased overflow-hidden">
 
-<div id="root" class="flex flex-col h-screen">
-<!-- Header -->
-<header class="bg-white border-b border-gray-200 shadow-sm">
-    <div class="container mx-auto px-4">
-        <div class="flex items-center justify-between h-16">
-            <div class="flex items-center space-x-8">
-                <img src="https://placehold.co/150x40/003C3C/FFFFFF?text=Cartesian+Kinetics" alt="Cartesian Kinetics Logo" class="h-10">
-                <nav class="hidden md:flex items-center space-x-1">
-                    <a href="#" class="px-3 py-2 text-sm font-semibold rounded-md nav-link-active">Decommission</a>
-                    <a href="#" class="px-3 py-2 text-sm font-medium rounded-md nav-link">Inbounds</a>
-                    <a href="#" class="px-3 py-2 text-sm font-medium rounded-md nav-link">Fulfillment</a>
-                </nav>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="text-right text-xs text-primary-dark">
-                    <div id="date-time">01:50 PM Wed 2025</div>
-                    <div>John Doe</div>
-                </div>
-                <a href="#" class="cursor-pointer">
-                    <img src="https://placehold.co/40x40/EFEFEF/333333?text=JD" alt="User Avatar" class="w-10 h-10 rounded-full"
-                    onerror="this.onerror=null;this.src='https://placehold.co/40x40/EFEFEF/333333?text=JD';">
-                </a>
-            </div>
-        </div>
-    </div>
-</header>
-
-<!-- Main Content -->
-<main class="flex-grow p-4 md:p-6">
-    <div class="container mx-auto">
-        <div class="flex justify-between items-center mb-4">
-             <h2 class="text-lg font-semibold text-primary-darkest">Warehouse Bins</h2>
-             <button id="reset-wave-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Reset Wave</button>
-        </div>
-        <p class="text-sm text-gray-600 mb-4">Click on a bin to begin the decommissioning process.</p>
-        <div id="bins-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-4">
-            <!-- Bins will be dynamically populated by the script -->
-        </div>
-    </div>
-</main>
-</div>
-
-<!-- Decommission Modal Dialog -->
-<div id="decommission-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl mx-auto">
-        <div class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-
-            <!-- ===== Left Pane: Tote Info ===== -->
-            <div class="bg-gray-50 rounded-lg p-4 flex flex-col border border-gray-200">
-                <h2 class="text-xl font-bold text-primary-darkest mb-4 border-b pb-2">Tote Information</h2>
-                <div>
-                    <p class="text-sm text-gray-500 uppercase font-semibold">Tote ID</p>
-                    <h3 id="modal-tote-id" class="text-2xl font-semibold text-gray-800"></h3>
-                </div>
-                <div class="mt-4 flex-grow">
-                    <p class="text-sm text-gray-500 uppercase font-semibold mb-2">Contents</p>
-                    <ul id="modal-sku-list" class="space-y-3 overflow-y-auto max-h-80 pr-2">
-                        <!-- SKU list will be populated here -->
-                    </ul>
-                </div>
-            </div>
-
-            <!-- ===== Middle Pane: SKU Images ===== -->
-            <div class="bg-gray-50 rounded-lg p-4 flex flex-col border border-gray-200">
-                <h2 class="text-xl font-bold text-primary-darkest mb-4 border-b pb-2">SKU Images</h2>
-                <div id="modal-sku-images" class="grid grid-cols-2 gap-4 flex-grow content-start overflow-y-auto max-h-96">
-                    <!-- SKU images will be populated here -->
-                </div>
-            </div>
-
-            <!-- ===== Right Pane: Action ===== -->
-            <div class="bg-gray-50 rounded-lg p-4 flex flex-col border border-gray-200">
-                <h2 class="text-xl font-bold text-primary-darkest mb-4 border-b pb-2">Action Required</h2>
-                <div class="flex-grow flex flex-col items-center justify-center">
-                     <div class="relative w-40 h-56">
-                        <!-- Blue Box -->
-                        <div class="bg-blue-500 rounded-lg w-full h-full flex items-center justify-center p-4 shadow-lg">
-                            <span class="text-white text-lg font-semibold text-center leading-tight">Please take the tote out</span>
+    <div id="root" class="flex flex-col h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center space-x-8">
+                        <div class="bg-primary-dark p-2 rounded">
+                            <img src="https://placehold.co/150x40/003C3C/FFFFFF?text=Cartesian+Kinetics" alt="Logo" class="h-8">
                         </div>
-                        <!-- Animated Arrow SVG -->
-                         <svg class="animated-arrow absolute w-24 h-24 text-red-500" style="top: 5rem; right: -5rem;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor">
-                           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="#" class="px-3 py-2 text-sm font-semibold rounded-md nav-link-active">Order Fulfillment</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Inbounds</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Replenishment</a>
+                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Cycle Count</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right text-xs">
+                            <div id="date-time" class="font-bold"></div>
+                            <div class="text-gray-500">John Doe</div>
+                        </div>
+                        <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-600 border border-gray-300">JD</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Active Orders Bar -->
+            <div class="bg-gray-50 border-t border-gray-200">
+                <div class="container mx-auto px-4 py-3">
+                    <div class="flex justify-between items-end">
+                        <h3 class="text-[10px] font-bold uppercase text-gray-400 mb-1">Active Batch Orders</h3>
+                        <span id="batch-counter" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Batch 1 of 3</span>
+                    </div>
+                    <div id="order-legend" class="flex items-center space-x-4 overflow-x-auto">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow p-4 md:p-6 overflow-y-auto">
+            <div class="container mx-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-primary-darkest">Pickup Items</h2>
+                    <span id="mapping-status" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Wave Active</span>
+                </div>
+                <div id="bins-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-4">
+                    <!-- Bins populated by JS -->
+                </div>
+                <div class="mt-8 flex justify-end">
+                    <button id="main-done-btn" class="px-8 py-3 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed transition-all" disabled>Complete Wave</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- TOTE MAPPING MODAL -->
+    <div id="mapping-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Map Order Totes</h2>
+                <p class="text-gray-500 mt-2">Scan the Tote ID for the next 4 locations on the wall</p>
+            </div>
+
+            <div id="mapping-grid" class="grid grid-cols-2 gap-6 mb-8">
+                <!-- Location cards -->
+            </div>
+
+            <div class="flex justify-between items-center pt-6 border-t">
+                <p id="mapping-batch-info" class="text-sm font-medium text-gray-500">Batch progress: 1 of 3 batches</p>
+                <button id="submit-mapping-btn" class="px-10 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Begin Picking
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PICKUP MODAL -->
+    <div id="pickup-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl">
+            <div class="p-8 flex justify-between items-stretch gap-8">
+
+                <!-- Left Cluster: Pick -->
+                <div class="flex flex-col space-y-6 w-80">
+                    <h2 class="text-2xl font-bold text-center text-primary-darkest">Pick</h2>
+                    <div>
+                        <h3 id="modal-item-name" class="text-3xl font-bold text-gray-800">Industrial Widget</h3>
+                        <p class="text-sm text-gray-500 font-semibold mt-2">Partition: <span id="modal-partition-number"></span></p>
+                        <p class="text-sm text-gray-500 flex items-center">Order ID: 
+                            <span id="modal-order-dot" class="inline-block w-4 h-4 rounded-sm mx-2"></span>
+                            <span id="modal-order-id" class="font-bold"></span>
+                        </p>
+                        <p class="text-sm text-gray-500 font-medium">SKU ID: <span id="modal-sku-id" class="font-mono"></span></p>
+                    </div>
+                    
+                    <div class="flex-grow flex flex-col">
+                        <div id="modal-compartment-view" class="bg-white rounded-lg aspect-square flex items-center justify-center p-3 border-2 transition-all">
+                        </div>
+                        <p class="text-xs text-center text-gray-500 mt-2 uppercase font-bold tracking-widest">Bin View</p>
+                    </div>
+
+                    <div id="modal-qty-container" class="border-2 rounded-lg p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Pickup Quantity</p>
+                        <div class="flex items-center justify-center space-x-4 mt-1">
+                            <button id="modal-minus-btn" class="rounded-full w-10 h-10 flex items-center justify-center text-2xl font-bold bg-primary-darkest text-white hover:bg-black transition-colors">-</button>
+                            <p id="modal-quantity-counter" class="text-4xl font-black w-28"></p>
+                            <button id="modal-plus-btn" class="rounded-full w-10 h-10 flex items-center justify-center text-2xl font-bold bg-primary-darkest text-white hover:bg-black transition-colors">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Cluster: SKU Image -->
+                <div class="flex flex-col items-center justify-center flex-grow">
+                    <div class="w-full max-w-sm text-center">
+                        <div class="relative bg-gray-100 rounded-3xl p-4 border-4 border-primary-dark">
+                             <div class="w-full aspect-square bg-primary-dark rounded-xl flex items-center justify-center">
+                                <span class="text-white text-4xl font-black uppercase tracking-widest">Widget</span>
+                             </div>
+                        </div>
+                        <p class="text-xs text-center text-gray-400 mt-4 font-bold uppercase tracking-widest">SKU Visual Reference</p>
+                    </div>
+                    <div class="mt-8">
+                        <svg class="w-20 h-20 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                         </svg>
                     </div>
-                    <p class="text-center mt-8 text-sm font-semibold text-primary-dark">Remove tote from its location.</p>
                 </div>
-                <div class="mt-4">
-                    <button id="modal-decommission-btn" class="w-full text-center py-4 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 text-lg transition-colors">Decommission</button>
-                    <p class="text-xs text-center text-gray-500 mt-2">Acknowledge only after removing the tote.</p>
-                </div>
-            </div>
 
+                <!-- Right Cluster: Put -->
+                <div class="flex flex-col space-y-6 w-80">
+                    <h2 class="text-2xl font-bold text-center text-primary-darkest">Put</h2>
+                    
+                    <div id="tote-map-container" class="flex-grow flex flex-col">
+                        <div class="flex-grow flex items-center justify-center">
+                            <div class="w-full">
+                                <div id="tote-map" class="grid grid-cols-2 grid-rows-2 gap-4 aspect-square w-full">
+                                    <div id="tote-1" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 1</div>
+                                    <div id="tote-2" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 2</div>
+                                    <div id="tote-3" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 3</div>
+                                    <div id="tote-4" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 4</div>
+                                </div>
+                                <p class="text-[10px] font-bold text-center mt-3 uppercase tracking-widest text-gray-400">Put Wall Location</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-3 rounded-xl border-2 border-dashed border-gray-200 text-center">
+                        <span class="text-[10px] uppercase font-bold text-gray-400 block tracking-widest mb-1">Assigned Tote Barcode</span>
+                        <span id="modal-assigned-barcode" class="font-mono font-black text-xl text-primary-dark">---</span>
+                    </div>
+
+                    <div class="space-y-3">
+                         <button id="modal-done-btn" class="w-full text-center py-5 px-4 bg-gray-400 text-white font-black rounded-xl text-xl shadow-lg transition-all" disabled>CONFIRM PUT</button>
+                         <button onclick="closeModal()" class="w-full text-center py-2 text-gray-400 font-bold text-sm uppercase hover:text-gray-600">Cancel</button>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
-</div>
 
+    <!-- Feedbacks -->
+    <div id="completion-animation" class="hidden fixed inset-0 bg-black/50 items-center justify-center z-[100] animation-popup">
+        <div class="text-white text-4xl font-black p-12 bg-green-500 rounded-3xl shadow-2xl" id="completion-text"></div>
+    </div>
+    <div id="batch-complete-animation" class="hidden fixed inset-0 bg-black/80 items-center justify-center z-[100] animation-popup">
+        <div class="text-white text-4xl font-black p-12 bg-blue-600 rounded-3xl shadow-2xl text-center">
+            Batch Complete!<br>
+            <span class="text-lg font-medium opacity-80 mt-2 block">Ready for next 4 totes...</span>
+        </div>
+    </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const binsGrid = document.getElementById('bins-grid');
-    const modal = document.getElementById('decommission-modal');
-    const dateTimeElement = document.getElementById('date-time');
-    const resetWaveBtn = document.getElementById('reset-wave-btn');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM
+            const binsGrid = document.getElementById('bins-grid');
+            const mainModal = document.getElementById('pickup-modal');
+            const mappingModal = document.getElementById('mapping-modal');
+            const orderLegend = document.getElementById('order-legend');
+            const mainDoneBtn = document.getElementById('main-done-btn');
+            const dateTimeElement = document.getElementById('date-time');
+            const mappingGrid = document.getElementById('mapping-grid');
+            const submitMappingBtn = document.getElementById('submit-mapping-btn');
 
-    let binData = [];
+            // State
+            let allOrdersInWave = []; 
+            let orderMetadata = {};   
+            let binData = [];         
+            let activeBatchOids = []; 
+            let totalBatches = 0;
+            let currentBatchIndex = 0;
 
-    // --- DATE & TIME --- //
-    function updateDateTime() {
-        const now = new Date();
-        const options = { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true };
-        const timeString = now.toLocaleTimeString('en-US', options).replace(' ', '');
-        const yearString = now.getFullYear();
-        dateTimeElement.textContent = `${timeString} ${now.toLocaleDateString('en-US', {weekday:'short'})} ${yearString}`;
-    }
-
-    // --- DATA GENERATION --- //
-    function generateSku() {
-        const randomNum = Math.floor(Math.random() * 100) + 1;
-        return {
-            name: `Industrial Widget ${randomNum}`,
-            id: `SKU-${Math.random().toString(36).slice(2, 11).toUpperCase()}`,
-            imageUrl: `https://placehold.co/200x200/EFEFEF/333333?text=SKU-${randomNum}`,
-            quantity: Math.floor(Math.random() * 20) + 1,
-        };
-    }
-
-    function generateNewWave() {
-        binData = [];
-        const binTypes = ['1-compartment', '2-compartment', '4-compartment', 'empty'];
-        const itemColors = ['order-1', 'order-2', 'order-3'];
-
-        for (let i = 1; i <= 12; i++) {
-            const binLocationId = `${i}.1.1.`;
-            const randomType = binTypes[Math.floor(Math.random() * binTypes.length)];
-            const newBin = { id: binLocationId, type: randomType, items: [] };
-
-            if (randomType !== 'empty') {
-                let compartmentCount = 0;
-                if (randomType === '1-compartment') compartmentCount = 1;
-                if (randomType === '2-compartment') compartmentCount = 2;
-                if (randomType === '4-compartment') compartmentCount = 4;
-                
-                // Decide if this bin should be filled. Let's use a 70% chance.
-                const shouldFillBin = Math.random() > 0.3;
-
-                if (shouldFillBin) {
-                    for (let j = 0; j < compartmentCount; j++) {
-                        // Fill every compartment
-                        newBin.items.push({
-                            compartment: j,
-                            sku: generateSku(),
-                            colorClass: itemColors[Math.floor(Math.random() * itemColors.length)],
-                        });
-                    }
-                }
-                // If shouldFillBin is false, the items array remains empty, so the bin is not shown with items.
+            // --- DATE ---
+            function updateDateTime() {
+                const now = new Date();
+                const options = { hour: '2-digit', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+                dateTimeElement.textContent = now.toLocaleString('en-US', options);
             }
-            binData.push(newBin);
-        }
-        renderBins();
-    }
+            setInterval(updateDateTime, 1000);
+            updateDateTime();
 
-
-    // --- UI RENDERING --- //
-    function renderBins() {
-        binsGrid.innerHTML = '';
-
-        binData.forEach(data => {
-            const binWrapper = document.createElement('div');
-            binWrapper.dataset.binId = data.id;
-
-            if (data.type === 'empty' || data.items.length === 0) {
-                binWrapper.className = 'bg-white/60 border border-gray-300 rounded-lg p-3 flex flex-col aspect-[2/4]';
-                binWrapper.innerHTML = `<div class="flex-grow"></div>`;
-            } else {
-                binWrapper.className = 'bin-location bg-white rounded-lg p-1 flex flex-col aspect-[2/4] border border-gray-300 shadow-sm';
-                let gridClass = '', compartmentCount = 0;
-                if (data.type === '1-compartment') { gridClass = 'grid-cols-1 grid-rows-1'; compartmentCount = 1; }
-                if (data.type === '2-compartment') { gridClass = 'grid-cols-2 grid-rows-1'; compartmentCount = 2; }
-                if (data.type === '4-compartment') { gridClass = 'grid-cols-2 grid-rows-2'; compartmentCount = 4; }
-
-                let compartmentsHtml = '';
-                for (let i = 0; i < compartmentCount; i++) {
-                    const itemData = data.items.find(item => item.compartment === i);
-                    if (itemData) {
-                        compartmentsHtml += `<div class="rounded-md ${itemData.colorClass}"></div>`;
-                    } else {
-                        compartmentsHtml += `<div class="rounded-md item-inactive"></div>`;
-                    }
+            // --- WAVE GENERATION ---
+            function generateWave() {
+                allOrdersInWave = [];
+                orderMetadata = {};
+                binData = [];
+                currentBatchIndex = 0;
+                
+                const waveSize = 10;
+                totalBatches = Math.ceil(waveSize / 4);
+                
+                const colors = ['order-1', 'order-2', 'order-3', 'order-4'];
+                for (let i = 0; i < waveSize; i++) {
+                    const oid = `ORD-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                    allOrdersInWave.push(oid);
+                    orderMetadata[oid] = {
+                        id: oid,
+                        colorClass: colors[i % 4],
+                        items: 0,
+                        picked: 0,
+                        toteId: null,
+                        loc: null,
+                        completed: false
+                    };
                 }
-                binWrapper.innerHTML = `<div class="flex-grow grid ${gridClass} gap-1">${compartmentsHtml}</div>`;
 
-                // Add click listener for decommissioning
-                binWrapper.addEventListener('click', () => {
-                    openDecommissionModal(data.id);
+                // Generate 12 bins
+                const types = ['1-compartment', '2-compartment', '4-compartment', 'empty'];
+                for (let i = 1; i <= 12; i++) {
+                    const type = types[Math.floor(Math.random() * types.length)];
+                    const bin = { id: `${i}.1.1.`, type, items: [] };
+                    if (type !== 'empty') {
+                        const slots = type === '1-compartment' ? 1 : (type === '2-compartment' ? 2 : 4);
+                        for (let s = 0; s < slots; s++) {
+                            const targetOid = allOrdersInWave[Math.floor(Math.random() * allOrdersInWave.length)];
+                            bin.items.push({ compartment: s, orderId: targetOid });
+                            orderMetadata[targetOid].items++;
+                        }
+                    }
+                    binData.push(bin);
+                }
+
+                startNextBatch();
+            }
+
+            // --- BATCH WORKFLOW ---
+            function startNextBatch() {
+                activeBatchOids = allOrdersInWave
+                    .filter(oid => !orderMetadata[oid].completed && !orderMetadata[oid].toteId)
+                    .slice(0, 4);
+
+                if (activeBatchOids.length === 0) {
+                    checkWaveCompletion(true);
+                    return;
+                }
+
+                currentBatchIndex++;
+                showMappingModal();
+            }
+
+            function showMappingModal() {
+                mappingModal.classList.remove('hidden');
+                mappingGrid.innerHTML = '';
+                
+                document.getElementById('batch-counter').textContent = `Batch ${currentBatchIndex} of ${totalBatches}`;
+                document.getElementById('mapping-batch-info').textContent = `Batch progress: ${currentBatchIndex} of ${totalBatches} batches`;
+
+                activeBatchOids.forEach((oid, idx) => {
+                    const order = orderMetadata[oid];
+                    const card = document.createElement('div');
+                    card.className = `p-6 rounded-2xl border-4 bg-white flex flex-col items-center space-y-4 shadow-sm transition-all`;
+                    card.style.borderColor = `var(--${order.colorClass}-border)`;
+                    
+                    card.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                             <div class="w-5 h-5 rounded ${order.colorClass} border-2 border-black/10"></div>
+                             <span class="font-black text-2xl tracking-tight">${oid}</span>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Put Wall Location</p>
+                            <p class="text-4xl font-black text-primary-dark">LOC ${idx + 1}</p>
+                        </div>
+                        <input type="text" placeholder="Scan Tote ID..." 
+                               class="mapping-input w-full p-4 rounded-xl border-2 border-gray-200 text-center font-mono font-bold focus:border-blue-500 focus:ring-8 focus:ring-blue-100 focus:outline-none uppercase text-xl"
+                               data-oid="${oid}" data-idx="${idx}">
+                    `;
+                    mappingGrid.appendChild(card);
+                });
+
+                const inputs = document.querySelectorAll('.mapping-input');
+                inputs.forEach((input, i) => {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && input.value.trim()) {
+                            if (inputs[i+1]) inputs[i+1].focus();
+                            else finalizeMapping();
+                        }
+                    });
+                });
+                setTimeout(() => inputs[0]?.focus(), 200);
+            }
+
+            function finalizeMapping() {
+                const inputs = document.querySelectorAll('.mapping-input');
+                let allValid = true;
+                inputs.forEach(input => {
+                    if (!input.value.trim()) allValid = false;
+                    const oid = input.dataset.oid;
+                    orderMetadata[oid].toteId = input.value.trim().toUpperCase();
+                    orderMetadata[oid].loc = parseInt(input.dataset.idx) + 1;
+                });
+
+                if (!allValid) return;
+
+                mappingModal.classList.add('hidden');
+                renderBins();
+                updateOrderLegend();
+                showAnimation('completion-animation', 'Totes Mapped. Start Picking.');
+            }
+
+            submitMappingBtn.onclick = finalizeMapping;
+
+            // --- RENDERING ---
+            function renderBins() {
+                binsGrid.innerHTML = '';
+                binData.forEach(bin => {
+                    const binEl = document.createElement('div');
+                    binEl.className = `bin-location bg-white p-1 flex flex-col aspect-[2/4] border-waiting shadow-sm transition-all`;
+                    
+                    if (bin.type === 'empty') {
+                        binEl.classList.add('bg-gray-50', 'border-transparent', 'opacity-50');
+                        binEl.innerHTML = `<div class="flex-grow"></div>`;
+                    } else {
+                        const gridClass = bin.type === '1-compartment' ? 'grid-cols-1 grid-rows-1' : (bin.type === '2-compartment' ? 'grid-cols-2 grid-rows-1' : 'grid-cols-2 grid-rows-2');
+                        let html = `<div class="flex-grow grid ${gridClass} gap-1">`;
+                        
+                        const slots = bin.type === '1-compartment' ? 1 : (bin.type === '2-compartment' ? 2 : 4);
+                        for (let s = 0; s < slots; s++) {
+                            const item = bin.items.find(i => i.compartment === s);
+                            if (item) {
+                                const order = orderMetadata[item.orderId];
+                                const isInBatch = activeBatchOids.includes(item.orderId);
+                                
+                                let stateClass = 'item-waiting';
+                                if (!isInBatch) stateClass = 'item-not-in-batch';
+                                if (order.completed) stateClass = 'item-finished';
+
+                                html += `<div class="selectable-item rounded-lg ${stateClass} ${isInBatch ? order.colorClass : ''}" 
+                                            data-oid="${item.orderId}" data-bin="${bin.id}" data-slot="${s}"
+                                            onclick="handleItemClick(this)">
+                                            <div class="icon-finished hidden"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" /></svg></div>
+                                         </div>`;
+                            } else {
+                                html += `<div class="rounded-lg item-inactive"></div>`;
+                            }
+                        }
+                        html += `</div>`;
+                        binEl.innerHTML = html;
+                    }
+                    binEl.innerHTML += `<p class="text-[9px] font-black text-center text-gray-400 py-1 uppercase tracking-tighter">Bin Location:<br>${bin.id}</p>`;
+                    binsGrid.appendChild(binEl);
+                    updateBinBorder(binEl);
                 });
             }
 
-            binWrapper.innerHTML += `<p class="text-xs text-center text-primary-dark mt-2">Bin Location:<br><span class="font-semibold">${data.id}</span></p>`;
-            binsGrid.appendChild(binWrapper);
-        });
-    }
-
-    // --- MODAL LOGIC --- //
-    function openDecommissionModal(binId) {
-        const bin = binData.find(b => b.id === binId);
-        if (!bin) return;
-
-        // --- Get Modal DOM Elements ---
-        const toteIdEl = document.getElementById('modal-tote-id');
-        const skuListEl = document.getElementById('modal-sku-list');
-        const skuImagesEl = document.getElementById('modal-sku-images');
-        const decommissionBtn = document.getElementById('modal-decommission-btn');
-
-        // --- Populate Modal ---
-        toteIdEl.textContent = bin.id;
-        skuListEl.innerHTML = '';
-        skuImagesEl.innerHTML = '';
-
-        if (bin.items.length === 0) {
-            skuListEl.innerHTML = `<li class="text-gray-500">No items in this tote.</li>`;
-        }
-
-        bin.items.forEach(item => {
-            // Populate SKU list
-            const listItem = document.createElement('li');
-            listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
-            listItem.innerHTML = `
-                <div>
-                    <p class="font-semibold text-primary-darkest">${item.sku.name}</p>
-                    <p class="text-xs text-gray-500">${item.sku.id}</p>
-                </div>
-                <div class="text-right">
-                     <p class="font-bold text-lg text-primary-darkest">${item.sku.quantity}</p>
-                     <p class="text-xs text-gray-500">QTY</p>
-                </div>
-            `;
-            skuListEl.appendChild(listItem);
-
-            // Populate SKU images
-            const imageContainer = document.createElement('div');
-            imageContainer.className = 'relative';
-            imageContainer.innerHTML = `
-                <img src="${item.sku.imageUrl}" alt="${item.sku.name}" class="rounded-lg w-full aspect-square object-cover bg-gray-200">
-                <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center p-1 rounded-b-lg font-semibold">
-                    ${item.sku.name}
-                </div>
-            `;
-            skuImagesEl.appendChild(imageContainer);
-        });
-
-        // --- Setup Button ---
-        decommissionBtn.onclick = () => {
-            const binIndex = binData.findIndex(b => b.id === binId);
-            if (binIndex > -1) {
-                binData[binIndex].type = 'empty';
-                binData[binIndex].items = [];
+            function updateOrderLegend() {
+                orderLegend.innerHTML = '';
+                activeBatchOids.forEach(oid => {
+                    const order = orderMetadata[oid];
+                    const el = document.createElement('div');
+                    el.className = `flex-shrink-0 flex items-center space-x-3 px-4 py-2 bg-white rounded-xl border shadow-sm min-w-[160px]`;
+                    el.innerHTML = `
+                        <div class="w-4 h-4 rounded-sm ${order.colorClass} border border-black/10"></div>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-black leading-none text-primary-darkest">${order.id}</span>
+                            <span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Lines: ${order.picked} of ${order.items}</span>
+                        </div>
+                    `;
+                    orderLegend.appendChild(el);
+                });
             }
-            closeModal();
-            renderBins();
-        };
 
-        modal.classList.remove('hidden');
-    }
+            // --- PICKING LOGIC ---
+            let modalQty = 0;
+            let targetQty = 0;
+            let confirmedTote = false;
+            let currentItemNode = null;
 
-    function closeModal() {
-        modal.classList.add('hidden');
-    }
+            window.handleItemClick = (node) => {
+                if (node.classList.contains('item-not-in-batch') || node.classList.contains('item-finished')) return;
+                
+                currentItemNode = node;
+                const oid = node.dataset.oid;
+                const order = orderMetadata[oid];
 
-    // --- GLOBAL EVENT LISTENERS --- //
-    modal.addEventListener('click', e => {
-        if (e.target.id === 'decommission-modal') {
-            closeModal();
-        }
-    });
+                targetQty = Math.floor(Math.random() * 8) + 1;
+                // DEFAULT AS EQUALS on both sides of "/"
+                modalQty = targetQty; 
+                confirmedTote = false;
+                
+                document.getElementById('modal-item-name').textContent = `Industrial Widget ${Math.floor(Math.random()*999)}`;
+                document.getElementById('modal-order-id').textContent = oid;
+                document.getElementById('modal-order-dot').className = `inline-block w-4 h-4 rounded-sm mx-2 border ${order.colorClass}`;
+                document.getElementById('modal-sku-id').textContent = `SKU-${Math.random().toString(36).substring(7).toUpperCase()}`;
+                document.getElementById('modal-assigned-barcode').textContent = order.toteId;
+                
+                const binEl = node.closest('.bin-location');
+                const allSlots = Array.from(binEl.querySelectorAll('.selectable-item, .item-inactive, .rounded-lg:not(.selectable-item)'));
+                document.getElementById('modal-partition-number').textContent = allSlots.indexOf(node) + 1;
 
-    resetWaveBtn.addEventListener('click', generateNewWave);
+                // Mini View - Solid color block coordination + DASHED border (as per image_5c745c)
+                const miniView = document.getElementById('modal-compartment-view');
+                miniView.style.borderColor = `var(--${order.colorClass}-border)`;
+                miniView.innerHTML = binEl.querySelector('.grid').outerHTML;
+                
+                const gridNode = miniView.querySelector('.grid');
+                gridNode.classList.remove('gap-1');
+                gridNode.classList.add('gap-2', 'h-full', 'w-full');
 
-    // --- START APP --- //
-    generateNewWave();
-    updateDateTime();
-    setInterval(updateDateTime, 60000); // Update every minute
-});
-</script>
+                const miniSlots = gridNode.children;
+                Array.from(miniSlots).forEach((cl, i) => {
+                    const originalSlot = allSlots[i];
+                    if (originalSlot === node) {
+                        // ACTIVE COMPARTMENT: Solid block color + dark dashed border
+                        cl.className = `rounded-lg flex items-center justify-center transition-all modal-active-compartment ${order.colorClass}`;
+                        cl.innerHTML = "";
+                    } else {
+                        // INACTIVE COMPARTMENT: Clean white/gray
+                        cl.className = `rounded-lg bg-white border border-gray-100`;
+                        cl.innerHTML = "";
+                    }
+                });
 
+                // Tote Wall - Display TOTE IDs as per image_5c7498
+                const totes = document.querySelectorAll('.order-tote');
+                totes.forEach((t, i) => {
+                    const locId = i + 1;
+                    const assignedBatchOrder = activeBatchOids.find(boid => orderMetadata[boid].loc === locId);
+                    
+                    t.className = 'order-tote border-2 border-gray-300 rounded-2xl flex flex-col items-center justify-center font-bold text-center p-2 text-[10px] transition-all cursor-pointer';
+                    t.innerHTML = `<span class="opacity-40 uppercase text-[7px] mb-1 font-bold">Loc ${locId}</span>`;
+
+                    if (assignedBatchOrder) {
+                        const o = orderMetadata[assignedBatchOrder];
+                        t.classList.add(o.colorClass);
+                        t.innerHTML += `<span class="text-xs font-black tracking-tight">${o.toteId}</span>`;
+                        if (o.id === oid) t.classList.add('tote-highlight');
+                    } else {
+                        t.innerHTML += `<span class="opacity-20 font-bold">EMPTY</span>`;
+                    }
+
+                    t.onclick = () => {
+                        if (assignedBatchOrder === oid) {
+                            confirmedTote = !confirmedTote;
+                            // SELECTED Cue for Put wall pane as per image_5c7b81
+                            t.classList.toggle('tote-confirmed', confirmedTote);
+                            updateModalButtons();
+                        }
+                    };
+                });
+
+                updateCounterDisplay();
+                mainModal.classList.remove('hidden');
+                node.classList.add('item-selected');
+                updateBinBorder(binEl);
+            };
+
+            function updateCounterDisplay() {
+                document.getElementById('modal-quantity-counter').textContent = `${modalQty}/${targetQty}`;
+                updateModalButtons();
+            }
+
+            function updateModalButtons() {
+                const btn = document.getElementById('modal-done-btn');
+                const ready = modalQty === targetQty && confirmedTote;
+                btn.disabled = !ready;
+                btn.className = ready 
+                    ? "w-full py-5 bg-green-500 text-white font-black rounded-xl text-xl shadow-lg hover:bg-green-600 transition-all scale-105" 
+                    : "w-full py-5 bg-gray-400 text-white font-black rounded-xl text-xl transition-all";
+            }
+
+            document.getElementById('modal-plus-btn').onclick = () => { if(modalQty < targetQty + 5) { modalQty++; updateCounterDisplay(); } };
+            document.getElementById('modal-minus-btn').onclick = () => { if(modalQty > 0) { modalQty--; updateCounterDisplay(); } };
+            
+            document.getElementById('modal-done-btn').onclick = () => {
+                const oid = currentItemNode.dataset.oid;
+                const order = orderMetadata[oid];
+                order.picked++;
+
+                currentItemNode.classList.remove('item-selected', 'item-waiting');
+                currentItemNode.classList.add('item-finished');
+                currentItemNode.querySelector('.icon-finished').classList.remove('hidden');
+
+                if (order.picked >= order.items) {
+                    order.completed = true;
+                    showAnimation('completion-animation', `${oid} Completed!`);
+                }
+
+                closeModal();
+                updateOrderLegend();
+                checkBatchCompletion();
+            };
+
+            window.closeModal = () => {
+                if (currentItemNode) {
+                    currentItemNode.classList.remove('item-selected');
+                    updateBinBorder(currentItemNode.closest('.bin-location'));
+                }
+                mainModal.classList.add('hidden');
+            };
+
+            function updateBinBorder(binEl) {
+                if (binEl.classList.contains('opacity-50')) return;
+                const selected = binEl.querySelector('.item-selected');
+                const finished = binEl.querySelectorAll('.item-finished').length;
+                const total = binEl.querySelectorAll('.selectable-item').length;
+
+                binEl.classList.remove('border-waiting', 'border-finished');
+                if (selected) {
+                    const order = orderMetadata[selected.dataset.oid];
+                    binEl.style.borderColor = `var(--${order.colorClass}-border)`;
+                } else if (finished > 0 && finished === total) {
+                    binEl.classList.add('border-finished');
+                } else {
+                    binEl.classList.add('border-waiting');
+                }
+            }
+
+            function checkBatchCompletion() {
+                const batchDone = activeBatchOids.every(oid => orderMetadata[oid].completed);
+                if (batchDone) {
+                    showAnimation('batch-complete-animation');
+                    setTimeout(startNextBatch, 2500);
+                }
+            }
+
+            function checkWaveCompletion(isDone) {
+                if (isDone) {
+                    mainDoneBtn.disabled = false;
+                    mainDoneBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    mainDoneBtn.classList.add('bg-green-600', 'hover:bg-green-700', 'shadow-lg');
+                    document.getElementById('mapping-status').textContent = 'Wave Finished';
+                    document.getElementById('mapping-status').className = "bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider";
+                }
+            }
+
+            function showAnimation(id, text) {
+                const el = document.getElementById(id);
+                if (text) el.querySelector('div').textContent = text;
+                el.classList.add('show');
+                el.classList.remove('hidden');
+                setTimeout(() => {
+                    el.classList.remove('show');
+                    el.classList.add('hidden');
+                }, 2400);
+            }
+
+            mainDoneBtn.onclick = () => {
+                showAnimation('batch-complete-animation', 'Wave Archive Successful');
+                setTimeout(generateWave, 2500);
+            };
+
+            generateWave();
+        });
+    </script>
 </body>
 </html>
