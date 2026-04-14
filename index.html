@@ -23,12 +23,16 @@
         .bg-ptl-2 { background-color: var(--ptl-blue); }
         .bg-ptl-3 { background-color: var(--ptl-cyan); }
         .bg-ptl-4 { background-color: var(--ptl-magenta); }
+
+        .text-ptl-1 { color: var(--ptl-red); }
+        .text-ptl-2 { color: var(--ptl-blue); }
+        .text-ptl-3 { color: var(--ptl-cyan); }
+        .text-ptl-4 { color: var(--ptl-magenta); }
         
         .bin-partition {
             height: 65vh;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            overflow: hidden;
         }
         .item-unmapped { border: 3px dashed var(--ptl-gray); background-color: #F1F5F9; cursor: pointer; }
         .item-active { border: 4px solid transparent; cursor: pointer; }
@@ -40,8 +44,6 @@
             cursor: not-allowed;
             opacity: 0.9;
         }
-
-        .check-icon { font-size: 2rem; color: var(--ptl-green); }
 
         .confirm-btn-pulse { animation: pulse-shadow 2s infinite; }
         @keyframes pulse-shadow {
@@ -74,8 +76,8 @@
             <div class="h-full flex flex-col">
                 <div class="mb-4 flex justify-between items-end px-2">
                     <div>
-                        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Robotic Source: 12-Partition Tote</h2>
-                        <p class="text-xs font-medium text-slate-400 mt-1">Robot will swap tote automatically when tasks are depleted.</p>
+                        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Robotic Source Tote</h2>
+                        <p class="text-xs font-medium text-slate-400 mt-1">12-partition tray presented by AGC/AMR</p>
                     </div>
                     <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Station PW-04</span>
                 </div>
@@ -84,18 +86,18 @@
         </main>
 
         <footer class="bg-slate-900 text-white/40 text-[9px] font-bold uppercase py-3 text-center tracking-[0.3em]">
-            Outbound Fulfillment Mode &bull; Cartesian Kinetics G2P v4.4
+            Outbound Fulfillment Mode &bull; Cartesian Kinetics G2P v4.5
         </footer>
     </div>
 
     <div id="mapping-modal" class="hidden fixed inset-0 bg-slate-900/95 flex items-center justify-center z-[100] p-6">
         <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md p-10 text-center">
-            <h2 class="text-3xl font-black text-slate-900">Assign to Wall</h2>
+            <h2 class="text-3xl font-black text-slate-900">Initialize Slot</h2>
             <p id="map-order-id" class="font-mono text-blue-600 font-bold text-2xl mt-2 mb-10"></p>
             <div class="space-y-6 text-left">
-                <input id="input-loc" type="text" placeholder="e.g. PUT-1" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-600 outline-none uppercase font-mono">
-                <input id="input-tote" type="text" placeholder="TOTE-XXXX" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-600 outline-none uppercase font-mono">
-                <button id="btn-confirm-map" class="w-full py-6 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700">INITIALIZE SLOT</button>
+                <input id="input-loc" type="text" placeholder="Location (e.g. PUT-1)" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-600 outline-none uppercase font-mono">
+                <input id="input-tote" type="text" placeholder="Scan Tote Barcode" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-600 outline-none uppercase font-mono">
+                <button id="btn-confirm-map" class="w-full py-6 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700">MAP ORDER</button>
             </div>
         </div>
     </div>
@@ -105,7 +107,7 @@
             <div class="flex-1 p-16 flex flex-col justify-between border-r border-slate-100">
                 <div class="flex justify-between items-start">
                     <div>
-                        <h3 id="pick-sku-name" class="text-6xl font-black text-slate-900">--</h3>
+                        <h3 id="pick-sku-name" class="text-6xl font-black text-slate-900 leading-tight">--</h3>
                         <p id="pick-sku-id" class="text-xl font-mono text-slate-400 mt-4 uppercase"></p>
                     </div>
                     <p id="pick-order-id" class="font-mono text-2xl font-bold text-blue-600"></p>
@@ -128,14 +130,25 @@
 
     <div id="release-modal" class="hidden fixed inset-0 bg-green-500/95 flex items-center justify-center z-[150] p-6">
         <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl p-16 text-center">
+            <div class="text-7xl mb-6">✅</div>
             <h2 class="text-4xl font-black text-slate-900 mb-2">Order Complete</h2>
-            <p id="rel-order-id" class="font-mono text-2xl text-slate-500 mb-10"></p>
-            <button id="btn-release-tote" class="w-full py-7 bg-slate-900 text-white rounded-2xl font-black text-xl shadow-xl">Confirm Order Tote Release</button>
+            <p id="rel-order-id" class="font-mono text-xl text-slate-500 mb-10"></p>
+            
+            <div class="bg-slate-50 p-10 rounded-[2rem] mb-10 border-2 border-slate-100 flex flex-col items-center">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mb-4">Action: Remove Tote From</p>
+                <p id="rel-loc-display" class="text-6xl font-black tracking-tighter">--</p>
+            </div>
+
+            <button id="btn-release-tote" class="w-full py-7 bg-slate-900 text-white rounded-2xl font-black text-xl shadow-xl hover:bg-black transition-all">
+                Confirm Order Tote Release
+            </button>
         </div>
     </div>
 
     <script>
         const PTL_MAP = { 'PUT-1': 'bg-ptl-1', 'PUT-2': 'bg-ptl-2', 'PUT-3': 'bg-ptl-3', 'PUT-4': 'bg-ptl-4' };
+        const PTL_TEXT = { 'PUT-1': 'text-ptl-1', 'PUT-2': 'text-ptl-2', 'PUT-3': 'text-ptl-3', 'PUT-4': 'text-ptl-4' };
+        
         let waveQueue = [], activeOrders = [], wallSlots = { 'PUT-1': null, 'PUT-2': null, 'PUT-3': null, 'PUT-4': null };
         let currentRobotTote = [];
         let currentTx = null, ordersCompleted = 0;
@@ -144,7 +157,7 @@
             for(let i=0; i<20; i++) {
                 waveQueue.push({
                     id: `ORD-${Math.random().toString(36).substring(7).toUpperCase()}`,
-                    total: Math.floor(Math.random() * 4) + 1, // Increased variety
+                    total: Math.floor(Math.random() * 4) + 1,
                     picked: 0, mappedLoc: null, tote: null
                 });
             }
@@ -159,9 +172,7 @@
         }
 
         function generateNewRobotTote() {
-            // 1. Reset to 12 empty partitions
             currentRobotTote = Array(12).fill(null).map(() => ({ orderId: null, isPicked: true }));
-            
             let tasks = [];
             activeOrders.forEach(order => {
                 const remaining = order.total - order.picked;
@@ -174,18 +185,12 @@
                     });
                 }
             });
-
-            // 2. Shuffle indices 0-11 to distribute tasks randomly
             let indices = Array.from({length: 12}, (_, i) => i);
             for (let i = indices.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [indices[i], indices[j]] = [indices[j], indices[i]];
             }
-
-            // 3. Fill shuffled slots
-            tasks.forEach((task, i) => {
-                if (i < 12) currentRobotTote[indices[i]] = task;
-            });
+            tasks.forEach((task, i) => { if (i < 12) currentRobotTote[indices[i]] = task; });
         }
 
         function render() {
@@ -219,19 +224,14 @@
                 if (!item.orderId) {
                     div.className = "bin-partition rounded-3xl border-2 border-slate-100 flex items-center justify-center text-slate-200 font-bold uppercase text-[10px] tracking-widest";
                     div.textContent = "Empty";
-                    row.appendChild(div);
-                    return;
-                }
-
-                const order = activeOrders.find(o => o.id === item.orderId);
-                const mapped = order && order.mappedLoc;
-                
-                if (item.isPicked) {
+                } else if (item.isPicked) {
                     div.className = "bin-partition rounded-3xl item-picked flex flex-col items-center justify-center space-y-4";
-                    div.innerHTML = `<span class="check-icon">✓</span><span class="text-[10px] font-black text-green-700 tracking-widest uppercase">Picked</span>`;
+                    div.innerHTML = `<span class="text-3xl text-green-500">✓</span><span class="text-[10px] font-black text-green-700 uppercase tracking-widest">Picked</span>`;
                 } else {
+                    const order = activeOrders.find(o => o.id === item.orderId);
+                    const mapped = order && order.mappedLoc;
                     div.className = `bin-partition rounded-3xl flex flex-col justify-between p-6 ${mapped ? 'item-active ' + PTL_MAP[order.mappedLoc] : 'item-unmapped'}`;
-                    div.innerHTML = `<div class="flex flex-col items-center">${mapped ? `<span class="bg-black/10 text-white text-[9px] px-3 py-1 rounded-full font-bold">${order.mappedLoc}</span>` : '<span class="text-[8px] text-slate-400 font-bold uppercase tracking-[0.2em]">Unmapped</span>'}</div><div class="text-center"><p class="text-sm font-black leading-tight ${mapped ? 'text-white' : 'text-slate-500'}">${item.sku}</p><p class="text-[10px] font-mono mt-4 ${mapped ? 'text-white/60' : 'text-slate-400'}">${item.orderId}</p></div>`;
+                    div.innerHTML = `<div class="flex flex-col items-center">${mapped ? `<span class="bg-black/20 text-white text-[9px] px-3 py-1 rounded-full font-bold">${order.mappedLoc}</span>` : '<span class="text-[8px] text-slate-400 font-bold uppercase tracking-[0.2em]">Unmapped</span>'}</div><div class="text-center"><p class="text-sm font-black leading-tight ${mapped ? 'text-white' : 'text-slate-500'}">${item.sku}</p><p class="text-[10px] font-mono mt-4 ${mapped ? 'text-white/60' : 'text-slate-400'}">${item.orderId}</p></div>`;
                     div.onclick = () => onPartitionClick(item, idx);
                 }
                 row.appendChild(div);
@@ -244,16 +244,17 @@
             if(!order.mappedLoc) {
                 document.getElementById('map-order-id').textContent = order.id;
                 document.getElementById('mapping-modal').classList.remove('hidden');
+                document.getElementById('input-loc').value = '';
+                document.getElementById('input-tote').value = '';
                 document.getElementById('input-loc').focus();
             } else showPickModal();
         }
 
         document.getElementById('btn-confirm-map').onclick = () => {
             const loc = document.getElementById('input-loc').value.toUpperCase();
-            const tote = document.getElementById('input-tote').value.trim();
             if(!PTL_MAP[loc] || wallSlots[loc]) return alert("Invalid or Occupied Location (PUT-1 to PUT-4)");
             currentTx.order.mappedLoc = loc;
-            currentTx.order.tote = tote;
+            currentTx.order.tote = document.getElementById('input-tote').value.trim();
             wallSlots[loc] = { orderId: currentTx.order.id };
             document.getElementById('mapping-modal').classList.add('hidden');
             render();
@@ -273,20 +274,18 @@
             document.getElementById('pick-modal').classList.remove('hidden');
         }
 
-        function changeQty(amt) {
-            const disp = document.getElementById('pick-qty-display');
-            let [x, y] = disp.textContent.split('/').map(Number);
-            x += amt; if(x < 0) x = 0;
-            disp.textContent = `${x}/${y}`;
-        }
-
         document.getElementById('btn-confirm-put').onclick = () => {
             const { item, order } = currentTx;
             item.isPicked = true;
             order.picked++;
             document.getElementById('pick-modal').classList.add('hidden');
             if(order.picked >= order.total) {
+                // Populate Release Modal
                 document.getElementById('rel-order-id').textContent = order.id;
+                const locDisplay = document.getElementById('rel-loc-display');
+                locDisplay.textContent = order.mappedLoc;
+                locDisplay.className = `text-7xl font-black tracking-tighter ${PTL_TEXT[order.mappedLoc]}`;
+                
                 document.getElementById('release-modal').classList.remove('hidden');
             } else {
                 checkRobotToteDepletion();
@@ -306,8 +305,8 @@
         };
 
         function checkRobotToteDepletion() {
-            const remainingPicks = currentRobotTote.filter(i => i.orderId && !i.isPicked);
-            if (remainingPicks.length === 0) generateNewRobotTote();
+            const remaining = currentRobotTote.filter(i => i.orderId && !i.isPicked);
+            if (remaining.length === 0) generateNewRobotTote();
         }
 
         init();
