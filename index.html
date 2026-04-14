@@ -24,13 +24,14 @@
         .bg-ptl-4 { background-color: var(--ptl-magenta); }
         
         .bin-partition {
-            height: 60vh;
-            transition: all 0.2s ease;
+            height: 65vh;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
         }
         .item-unmapped { border: 3px dashed var(--ptl-gray); background-color: #E2E8F0; }
-        .item-active { cursor: pointer; border: 4px solid transparent; }
-        .item-active:hover { filter: brightness(1.1); transform: translateY(-4px); }
-        .item-finished { background-color: #CBD5E1 !important; cursor: not-allowed; opacity: 0.6; }
+        .item-active { border: 4px solid transparent; }
+        .item-active:hover { filter: brightness(1.05); transform: translateY(-4px); z-index: 10; }
+        .item-finished { background-color: #CBD5E1 !important; cursor: not-allowed; opacity: 0.6; border: none !important; }
 
         .confirm-btn-pulse { animation: pulse-shadow 2s infinite; }
         @keyframes pulse-shadow {
@@ -47,7 +48,8 @@
             <div class="container mx-auto flex items-center justify-between">
                 <div class="flex items-center space-x-6">
                     <div class="bg-slate-900 px-3 py-1 rounded text-white font-black">CK</div>
-                    <div id="put-wall-monitor" class="flex space-x-3"></div>
+                    <div id="put-wall-monitor" class="flex space-x-3">
+                        </div>
                 </div>
                 <div class="flex items-center space-x-8">
                     <div class="text-right">
@@ -61,15 +63,17 @@
 
         <main class="flex-grow p-6">
             <div class="h-full flex flex-col">
-                <div class="mb-4 flex justify-between items-center">
+                <div class="mb-4 flex justify-between items-center px-2">
                     <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Robotic Inbound: Bin Row</h2>
-                    <p class="text-xs font-medium text-slate-400 italic">Click gray partitions to map to wall locations</p>
+                    <p class="text-xs font-medium text-slate-400 italic">Click a gray partition to begin mapping</p>
                 </div>
-                <div id="bin-row" class="grid grid-cols-12 gap-3 flex-grow"></div>
+                <div id="bin-row" class="grid grid-cols-12 gap-3 flex-grow">
+                    </div>
             </div>
         </main>
+
         <footer class="bg-slate-900 text-white/40 text-[9px] font-bold uppercase py-2 text-center tracking-widest">
-            Station PW-04 &bull; Robotic Interface Mode v4.1
+            Station PW-04 &bull; Robotic Interface Mode v4.2
         </footer>
     </div>
 
@@ -78,9 +82,15 @@
             <h2 class="text-3xl font-black text-slate-900">Map to Wall</h2>
             <p id="map-order-id" class="font-mono text-blue-600 font-bold text-xl mb-8"></p>
             <div class="space-y-6 text-left">
-                <input id="input-loc" type="text" placeholder="LOCATION (e.g. LOC-1)" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-xl font-black text-center focus:border-blue-500 outline-none uppercase font-mono">
-                <input id="input-tote" type="text" placeholder="SCAN TOTE ID" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-xl font-black text-center focus:border-blue-500 outline-none uppercase font-mono">
-                <button id="btn-confirm-map" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700">INITIALIZE SLOT</button>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Location ID (PUT-1 to PUT-4)</label>
+                    <input id="input-loc" type="text" placeholder="e.g. PUT-1" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-xl font-black text-center focus:border-blue-500 outline-none uppercase font-mono">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Scan Tote Barcode</label>
+                    <input id="input-tote" type="text" placeholder="TOTE-XXXX" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-xl font-black text-center focus:border-blue-500 outline-none uppercase font-mono">
+                </div>
+                <button id="btn-confirm-map" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700 transition-all">INITIALIZE SLOT</button>
             </div>
         </div>
     </div>
@@ -88,13 +98,18 @@
     <div id="pick-modal" class="hidden fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[110] p-6">
         <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden flex h-[70vh]">
             <div class="flex-1 p-12 flex flex-col justify-between border-r border-slate-100">
-                <div>
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Partition <span id="pick-bin-id"></span></p>
-                    <h3 id="pick-sku-name" class="text-4xl font-black text-slate-900">--</h3>
-                    <p id="pick-sku-id" class="text-sm font-mono text-slate-400 mt-2"></p>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 id="pick-sku-name" class="text-5xl font-black text-slate-900">--</h3>
+                        <p id="pick-sku-id" class="text-sm font-mono text-slate-400 mt-2"></p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order ID</p>
+                        <p id="pick-order-id" class="font-mono text-xl font-bold text-blue-600"></p>
+                    </div>
                 </div>
                 <div class="bg-slate-900 text-white rounded-3xl p-10 text-center">
-                    <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40 mb-4">Quantity Confirmation</p>
+                    <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40 mb-4">Required Quantity</p>
                     <div class="flex items-center justify-center space-x-12">
                         <button onclick="changeQty(-1)" class="w-16 h-16 rounded-full border-2 border-white/20 text-3xl">-</button>
                         <span id="pick-qty-display" class="text-8xl font-black tabular-nums">1/1</span>
@@ -104,10 +119,10 @@
             </div>
             <div class="w-[400px] bg-slate-50 p-10 flex flex-col items-center justify-center">
                 <div id="put-wall-visual" class="grid grid-cols-2 grid-rows-2 gap-4 w-full aspect-square">
-                    <div id="vis-loc-1" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">1</div>
-                    <div id="vis-loc-2" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">2</div>
-                    <div id="vis-loc-3" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">3</div>
-                    <div id="vis-loc-4" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">4</div>
+                    <div id="vis-put-1" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">1</div>
+                    <div id="vis-put-2" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">2</div>
+                    <div id="vis-put-3" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">3</div>
+                    <div id="vis-put-4" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl">4</div>
                 </div>
                 <button id="btn-confirm-put" class="mt-10 w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-xl confirm-btn-pulse">CONFIRM PUT</button>
             </div>
@@ -118,39 +133,43 @@
         <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl p-12 text-center">
             <h2 class="text-4xl font-black text-slate-900 mb-2">Order Complete</h2>
             <p id="rel-order-id" class="font-mono text-2xl text-slate-500 mb-8"></p>
+            <div class="bg-slate-100 p-6 rounded-2xl mb-8">
+                <p class="text-lg font-bold">Remove from <span class="text-green-600">Location <span id="rel-loc-num"></span></span></p>
+            </div>
             <button id="btn-release-tote" class="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-xl shadow-xl">Confirm Order Tote Release</button>
         </div>
     </div>
 
     <script>
-        const PTL_MAP = { 'LOC-1': 'bg-ptl-1', 'LOC-2': 'bg-ptl-2', 'LOC-3': 'bg-ptl-3', 'LOC-4': 'bg-ptl-4' };
-        let waveQueue = [], activeOrders = [], wallSlots = { 'LOC-1': null, 'LOC-2': null, 'LOC-3': null, 'LOC-4': null };
-        let currentBins = [], currentTransaction = null, ordersCompleted = 0;
+        const PTL_MAP = { 'PUT-1': 'bg-ptl-1', 'PUT-2': 'bg-ptl-2', 'PUT-3': 'bg-ptl-3', 'PUT-4': 'bg-ptl-4' };
+        let waveQueue = [], activeOrders = [], wallSlots = { 'PUT-1': null, 'PUT-2': null, 'PUT-3': null, 'PUT-4': null };
+        let currentBins = [], currentTransaction = null, ordersCompletedCount = 0;
 
         function init() {
             for(let i=0; i<20; i++) {
                 waveQueue.push({
                     id: `ORD-${Math.random().toString(36).substring(7).toUpperCase()}`,
-                    total: Math.floor(Math.random() * 3) + 1, // Quantity required
+                    total: Math.floor(Math.random() * 3) + 1,
                     picked: 0, mappedLoc: null, tote: null
                 });
             }
             refreshActive();
             generateBins();
             render();
-            setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
+            
+            // Clock
+            setInterval(() => { 
+                document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+            }, 1000);
         }
 
         function refreshActive() {
             while (activeOrders.length < 4 && waveQueue.length > 0) activeOrders.push(waveQueue.shift());
         }
 
-        // FIXED LOGIC: Bin partitions are now based on actual order requirements
         function generateBins() {
             currentBins = [];
             let taskList = [];
-            
-            // Create a list of tasks where each order appears exactly 'total' times
             activeOrders.forEach(order => {
                 for(let i=0; i < order.total; i++) {
                     taskList.push({
@@ -160,18 +179,11 @@
                     });
                 }
             });
-
-            // Fill the 12 slots
             for(let i=0; i<12; i++) {
                 if (taskList[i]) {
-                    currentBins.push({
-                        ...taskList[i],
-                        id: `${Math.floor(Math.random()*9+1)}.${Math.floor(Math.random()*9+1)}`,
-                        done: false
-                    });
+                    currentBins.push({ ...taskList[i], done: false });
                 } else {
-                    // Placeholder if active orders don't fill 12 partitions
-                    currentBins.push({ id: 'EMPTY', orderId: null, sku: '---', skuId: '---', done: true });
+                    currentBins.push({ orderId: null, done: true });
                 }
             }
         }
@@ -179,19 +191,19 @@
         function render() {
             renderMonitor();
             renderBinRow();
-            document.getElementById('wave-progress').textContent = `${ordersCompleted} / 20 Orders`;
+            document.getElementById('wave-progress').textContent = `${ordersCompletedCount} / 20 Orders`;
         }
 
         function renderMonitor() {
             const monitor = document.getElementById('put-wall-monitor');
             monitor.innerHTML = '';
-            ['LOC-1', 'LOC-2', 'LOC-3', 'LOC-4'].forEach((loc, idx) => {
+            ['PUT-1', 'PUT-2', 'PUT-3', 'PUT-4'].forEach((loc, idx) => {
                 const slot = wallSlots[loc];
                 const div = document.createElement('div');
-                div.className = `w-32 h-12 rounded-lg border-2 flex flex-col justify-center px-3 transition-all ${slot ? PTL_MAP[loc] + ' border-transparent shadow-lg scale-105' : 'border-slate-200 opacity-30'}`;
+                div.className = `w-32 h-12 rounded-lg border-2 flex flex-col justify-center px-3 transition-all ${slot ? PTL_MAP[loc] + ' border-transparent shadow-lg' : 'border-slate-200 bg-slate-50 opacity-30'}`;
                 if(slot) {
                     const order = activeOrders.find(o => o.id === slot.orderId);
-                    div.innerHTML = `<div class="flex justify-between items-center"><span class="text-[8px] font-black text-white/50">LOC ${idx+1}</span><span class="text-[9px] font-bold text-white">${order.picked}/${order.total}</span></div><span class="text-[10px] font-bold text-white truncate">${slot.orderId}</span>`;
+                    div.innerHTML = `<div class="flex justify-between items-center"><span class="text-[8px] font-black text-white/50">PUT ${idx+1}</span><span class="text-[9px] font-bold text-white">${order.picked}/${order.total}</span></div><span class="text-[10px] font-bold text-white truncate">${slot.orderId}</span>`;
                 } else {
                     div.innerHTML = `<span class="text-[10px] font-bold text-slate-300 text-center uppercase">Empty</span>`;
                 }
@@ -203,16 +215,30 @@
             const row = document.getElementById('bin-row');
             row.innerHTML = '';
             currentBins.forEach((bin, idx) => {
+                const div = document.createElement('div');
                 if (!bin.orderId) {
-                    row.innerHTML += `<div class="bin-partition rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-200 font-bold">EMPTY</div>`;
+                    div.className = "bin-partition rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-300 font-bold uppercase text-[10px] tracking-widest";
+                    div.textContent = "Empty";
+                    row.appendChild(div);
                     return;
                 }
                 const order = activeOrders.find(o => o.id === bin.orderId);
                 const mapped = order && order.mappedLoc;
-                const div = document.createElement('div');
-                div.className = `bin-partition rounded-2xl flex flex-col justify-between p-4 ${bin.done ? 'item-finished' : (mapped ? 'item-active ' + PTL_MAP[order.mappedLoc] : 'item-unmapped')}`;
-                div.innerHTML = `<div class="flex flex-col items-center"><span class="text-[10px] font-black ${mapped ? 'text-white/40' : 'text-slate-400'}">${bin.id}</span>${mapped ? `<span class="mt-2 bg-black/10 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">${order.mappedLoc}</span>` : ''}</div><div class="text-center"><p class="text-xs font-black leading-tight ${mapped ? 'text-white' : 'text-slate-500'}">${bin.sku}</p><p class="text-[9px] font-mono mt-2 ${mapped ? 'text-white/60' : 'text-slate-400'}">${bin.orderId}</p></div>`;
-                if(!bin.done) div.onclick = () => onBinSelect(bin, idx);
+                
+                div.className = `bin-partition rounded-2xl flex flex-col justify-between p-6 ${bin.done ? 'item-finished' : (mapped ? 'item-active ' + PTL_MAP[order.mappedLoc] : 'item-unmapped')}`;
+                div.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        ${mapped ? `<span class="bg-black/10 text-white text-[10px] px-3 py-1 rounded-full font-bold">${order.mappedLoc}</span>` : '<span class="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Unmapped</span>'}
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm font-black leading-tight ${mapped ? 'text-white' : 'text-slate-500'}">${bin.sku}</p>
+                        <p class="text-[10px] font-mono mt-3 ${mapped ? 'text-white/60' : 'text-slate-400'}">${bin.orderId}</p>
+                    </div>
+                `;
+                
+                if(!bin.done) {
+                    div.addEventListener('click', () => onBinSelect(bin, idx));
+                }
                 row.appendChild(div);
             });
         }
@@ -223,14 +249,20 @@
             if(!order.mappedLoc) {
                 document.getElementById('map-order-id').textContent = order.id;
                 document.getElementById('mapping-modal').classList.remove('hidden');
+                document.getElementById('input-loc').value = '';
+                document.getElementById('input-tote').value = '';
                 document.getElementById('input-loc').focus();
-            } else showPickModal();
+            } else {
+                showPickModal();
+            }
         }
 
         document.getElementById('btn-confirm-map').onclick = () => {
             const loc = document.getElementById('input-loc').value.toUpperCase();
             const tote = document.getElementById('input-tote').value.trim();
-            if(!PTL_MAP[loc] || wallSlots[loc]) return alert("Invalid Location");
+            if(!PTL_MAP[loc] || wallSlots[loc]) return alert("Invalid Location (Enter PUT-1 to PUT-4)");
+            if(!tote) return alert("Scan Tote ID");
+
             currentTransaction.order.mappedLoc = loc;
             currentTransaction.order.tote = tote;
             wallSlots[loc] = { orderId: currentTransaction.order.id };
@@ -241,38 +273,56 @@
 
         function showPickModal() {
             const { bin, order } = currentTransaction;
-            document.getElementById('pick-bin-id').textContent = bin.id;
+            document.getElementById('pick-order-id').textContent = order.id;
             document.getElementById('pick-sku-name').textContent = bin.sku;
             document.getElementById('pick-sku-id').textContent = bin.skuId;
-            document.getElementById('pick-qty-display').textContent = `1/1`;
-            [1,2,3,4].forEach(i => document.getElementById(`vis-loc-${i}`).className = 'border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-3xl');
+            document.getElementById('pick-qty-display').textContent = `${order.total}/${order.total}`;
+            
+            // Visual Put Wall
+            [1,2,3,4].forEach(i => {
+                document.getElementById(`vis-put-${i}`).className = 'border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-4xl';
+            });
             const targetNum = order.mappedLoc.split('-')[1];
-            const targetEl = document.getElementById(`vis-loc-${targetNum}`);
-            targetEl.className = `border-8 rounded-3xl flex items-center justify-center text-white font-black text-6xl shadow-2xl border-white ${PTL_MAP[order.mappedLoc]}`;
+            const targetEl = document.getElementById(`vis-put-${targetNum}`);
+            targetEl.className = `border-8 rounded-3xl flex items-center justify-center text-white font-black text-7xl shadow-2xl border-white ${PTL_MAP[order.mappedLoc]}`;
+
             document.getElementById('pick-modal').classList.remove('hidden');
+        }
+
+        function changeQty(amt) {
+            const disp = document.getElementById('pick-qty-display');
+            let [x, y] = disp.textContent.split('/').map(Number);
+            x += amt;
+            if(x < 0) x = 0;
+            disp.textContent = `${x}/${y}`;
         }
 
         document.getElementById('btn-confirm-put').onclick = () => {
             const { bin, order } = currentTransaction;
-            bin.done = true; order.picked++;
+            bin.done = true;
+            order.picked++;
             document.getElementById('pick-modal').classList.add('hidden');
             if(order.picked >= order.total) {
                 document.getElementById('rel-order-id').textContent = order.id;
                 document.getElementById('rel-loc-num').textContent = order.mappedLoc.split('-')[1];
                 document.getElementById('release-modal').classList.remove('hidden');
-            } else render();
+            } else {
+                render();
+            }
         };
 
         document.getElementById('btn-release-tote').onclick = () => {
             const order = currentTransaction.order;
             wallSlots[order.mappedLoc] = null;
             activeOrders = activeOrders.filter(o => o.id !== order.id);
-            ordersCompleted++;
-            refreshActive(); generateBins();
+            ordersCompletedCount++;
+            refreshActive();
+            generateBins();
             document.getElementById('release-modal').classList.add('hidden');
             render();
         };
 
+        // Run Init
         init();
     </script>
 </body>
