@@ -3,690 +3,434 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warehouse Order Fulfillment | Cartesian Kinetics</title>
-    <!-- Tailwind CSS -->
+    <title>Dynamic Put Wall | Cartesian Kinetics</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-main: #F0EFE9;
-            --primary-dark: #003C3C;
-            --primary-darkest: #0D2021;
-            
-            /* State Colors */
-            --color-waiting-bg: #D1D5DB;
-            --color-waiting-border: #6B7280;
-            --color-selected-bg: #3B82F6;
-            --color-selected-border: #1D4ED8;
-            --color-finished-bg: #01DC82;
-            --color-finished-border: #003C3C;
-            --color-inactive-bg: #e5e7eb;
-
-            /* Order-specific Colors */
-            --order-1-bg: #FEF3C7; --order-1-border: #FBBF24;
-            --order-2-bg: #DBEAFE; --order-2-border: #60A5FA;
-            --order-3-bg: #FCE7F3; --order-3-border: #F472B6;
-            --order-4-bg: #DCFCE7; --order-4-border: #4ADE80;
+            --bg-main: #F8FAFC;
+            --ptl-red: #EF4444;
+            --ptl-blue: #3B82F6;
+            --ptl-cyan: #06B6D4;
+            --ptl-magenta: #D946EF;
+            --ptl-gray: #9CA3AF;
+            --ptl-green: #22C55E;
         }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-main);
-            color: var(--primary-darkest);
-        }
+        /* PTL Colors */
+        .bg-ptl-1 { background-color: var(--ptl-red); }
+        .bg-ptl-2 { background-color: var(--ptl-blue); }
+        .bg-ptl-3 { background-color: var(--ptl-cyan); }
+        .bg-ptl-4 { background-color: var(--ptl-magenta); }
         
-        /* --- Compartment Item States --- */
-        .selectable-item { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            position: relative;
-            overflow: hidden;
-            transition: all 0.2s ease;
-        }
-        .item-inactive { background-color: var(--color-inactive-bg); opacity: 0.4; cursor: not-allowed; }
-        .item-not-in-batch { background-color: #f3f4f6; border: 1px solid #e5e7eb; opacity: 0.3; cursor: not-allowed; }
-        
-        .item-waiting { border: 2px dashed var(--color-waiting-border) !important; }
-        .item-selected { 
-            border: 4px solid var(--color-selected-border) !important; 
-            transform: scale(1.02);
-            z-index: 10;
-        }
-        .item-finished { 
-            background-color: var(--color-finished-bg) !important; 
-            border: 2px solid var(--color-finished-border) !important; 
-        }
+        .border-ptl-1 { border-color: var(--ptl-red); }
+        .border-ptl-2 { border-color: var(--ptl-blue); }
+        .border-ptl-3 { border-color: var(--ptl-cyan); }
+        .border-ptl-4 { border-color: var(--ptl-magenta); }
 
-        /* Order Colors */
-        .order-1 { background-color: var(--order-1-bg); }
-        .order-2 { background-color: var(--order-2-bg); }
-        .order-3 { background-color: var(--order-3-bg); }
-        .order-4 { background-color: var(--order-4-bg); }
+        /* Item States */
+        .item-unmapped { border: 2px dashed var(--ptl-gray); background-color: #f3f4f6; opacity: 0.8; }
+        .item-active { border: 2px solid transparent; cursor: pointer; transition: transform 0.1s; }
+        .item-active:active { transform: scale(0.95); }
+        .item-finished { background-color: var(--ptl-green) !important; opacity: 0.5; cursor: not-allowed; }
 
-        .selectable-item .icon { display: none; width: 40%; height: 40%; }
-        .item-finished .icon-finished { display: block; color: var(--primary-dark); }
-
-        /* Bin Borders */
-        .bin-location { border-width: 2px; transition: border-color 0.3s; border-radius: 12px; }
-        .border-waiting { border-color: #D1D5DB; }
-        .border-finished { border-color: #01DC82; }
-
-        .nav-link-active { background-color: var(--primary-dark); color: white; }
-
-        /* Tote Highlight */
-        .tote-highlight { animation: pulse-border 1.5s infinite; border-width: 4px !important; }
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-
-        /* DASH for Active Compartment in Modal as per image_5c745c */
-        .modal-active-compartment {
-            border: 4px dashed #475569 !important; /* Thick Dark Gray Dash */
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        /* SELECTED cue for Put Wall Location as per image_5c7b81 */
-        .tote-confirmed {
-            outline: 6px solid #93C5FD !important; /* Light blue thick glow */
-            outline-offset: -2px;
-            transform: scale(0.98);
-        }
-
-        .animation-popup.show { display: flex; animation: fade-in-out 2.5s ease-in-out forwards; }
-        @keyframes fade-in-out {
-            0% { opacity: 0; transform: scale(0.8); }
-            20% { opacity: 1; transform: scale(1); }
-            80% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0; transform: scale(0.8); }
+        /* Status Glows */
+        .glow-active { box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        .pulse-complete { animation: pulse-green 1.5s infinite; }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
     </style>
 </head>
 <body class="antialiased overflow-hidden">
 
-    <div id="root" class="flex flex-col h-screen">
-        <!-- Header -->
-        <header class="bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
-            <div class="container mx-auto px-4">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center space-x-8">
-                        <div class="bg-primary-dark p-2 rounded">
-                            <img src="https://placehold.co/150x40/003C3C/FFFFFF?text=Cartesian+Kinetics" alt="Logo" class="h-8">
-                        </div>
-                        <nav class="hidden md:flex items-center space-x-1">
-                            <a href="#" class="px-3 py-2 text-sm font-semibold rounded-md nav-link-active">Order Fulfillment</a>
-                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Inbounds</a>
-                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Replenishment</a>
-                            <a href="#" class="px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100">Cycle Count</a>
-                        </nav>
+    <div id="app" class="flex flex-col h-screen">
+        <header class="bg-white border-b border-gray-200 shadow-sm p-4">
+            <div class="container mx-auto flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-slate-900 p-2 rounded-lg">
+                        <span class="text-white font-black tracking-tighter text-lg uppercase">CK</span>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="text-right text-xs">
-                            <div id="date-time" class="font-bold"></div>
-                            <div class="text-gray-500">John Doe</div>
-                        </div>
-                        <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-600 border border-gray-300">JD</div>
-                    </div>
+                    <h1 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Put Wall Monitor</h1>
                 </div>
-            </div>
-            <!-- Active Orders Bar -->
-            <div class="bg-gray-50 border-t border-gray-200">
-                <div class="container mx-auto px-4 py-3">
-                    <div class="flex justify-between items-end">
-                        <h3 class="text-[10px] font-bold uppercase text-gray-400 mb-1">Active Batch Orders</h3>
-                        <span id="batch-counter" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Batch 1 of 3</span>
+
+                <div id="put-wall-monitor" class="flex space-x-4">
                     </div>
-                    <div id="order-legend" class="flex items-center space-x-4 overflow-x-auto">
-                        <!-- Populated dynamically -->
-                    </div>
+
+                <div class="text-right">
+                    <div id="clock" class="font-bold text-slate-900">00:00</div>
+                    <div class="text-[10px] text-slate-400 font-bold uppercase">Station: PW-04</div>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
-        <main class="flex-grow p-4 md:p-6 overflow-y-auto">
+        <main class="flex-grow p-6 overflow-y-auto">
             <div class="container mx-auto">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold text-primary-darkest">Pickup Items</h2>
-                    <span id="mapping-status" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Wave Active</span>
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-800">Available Picks</h2>
+                        <p class="text-slate-500 text-sm">Click gray items to map them to the wall.</p>
+                    </div>
+                    <div class="bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
+                        <span class="text-[10px] block font-bold text-blue-400 uppercase">Wave Progress</span>
+                        <span id="wave-progress" class="font-black text-blue-700">0 / 20 Orders</span>
+                    </div>
                 </div>
-                <div id="bins-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-4">
-                    <!-- Bins populated by JS -->
-                </div>
+
+                <div id="bin-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    </div>
             </div>
         </main>
+
+        <footer class="bg-slate-900 text-white p-3 text-center text-[10px] font-bold uppercase tracking-[0.2em]">
+            Continuous Fulfillment Mode &bull; Cartesian Kinetics Systems v3.4
+        </footer>
     </div>
 
-    <!-- TOTE MAPPING MODAL -->
-    <div id="mapping-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-8">
+    <div id="mapping-modal" class="hidden fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[100] p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8">
             <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold text-gray-900">Map Order Totes</h2>
-                <p class="text-gray-500 mt-2">Scan the Tote ID for the next 4 locations on the wall</p>
+                <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">📍</div>
+                <h2 class="text-3xl font-black text-slate-900">Map Order</h2>
+                <p id="mapping-order-id" class="text-blue-600 font-bold text-xl font-mono"></p>
             </div>
-
-            <div id="mapping-grid" class="grid grid-cols-2 gap-6 mb-8">
-                <!-- Location cards -->
-            </div>
-
-            <div class="flex justify-between items-center pt-6 border-t">
-                <p id="mapping-batch-info" class="text-sm font-medium text-gray-500">Batch progress: 1 of 3 batches</p>
-                <button id="submit-mapping-btn" class="px-10 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Begin Picking
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Step 1: Scan Location Barcode</label>
+                    <input id="input-loc" type="text" placeholder="e.g. LOC-1" 
+                           class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-500 focus:outline-none uppercase font-mono">
+                    <p class="text-[9px] text-slate-400 mt-2 text-center">Accepted: <span class="text-slate-600">LOC-1, LOC-2, LOC-3, LOC-4</span></p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2 tracking-widest">Step 2: Scan Tote Barcode</label>
+                    <input id="input-tote" type="text" placeholder="Scan Tote ID..." 
+                           class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center focus:border-blue-500 focus:outline-none uppercase font-mono">
+                </div>
+                <button id="btn-confirm-mapping" class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xl hover:bg-black transition-all">
+                    Initialize Slot
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- PICKUP MODAL -->
-    <div id="pickup-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-6xl">
-            <div class="p-8 flex justify-between items-stretch gap-8">
+    <div id="pick-modal" class="hidden fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[110] p-4">
+        <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col md:flex-row h-[80vh]">
+            <div class="flex-1 p-12 flex flex-col justify-between border-r border-slate-100">
+                <div>
+                    <span class="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Source Bin: <span id="pick-bin-id"></span></span>
+                    <h3 id="pick-sku-name" class="text-4xl font-black text-slate-900 mt-4 leading-tight">Loading SKU...</h3>
+                    <p id="pick-sku-id" class="text-xl font-mono text-slate-400 mt-2"></p>
+                </div>
 
-                <!-- Left Cluster: Pick -->
-                <div class="flex flex-col space-y-6 w-80">
-                    <h2 class="text-2xl font-bold text-center text-primary-darkest">Pick</h2>
-                    <div>
-                        <h3 id="modal-item-name" class="text-3xl font-bold text-gray-800">Industrial Widget</h3>
-                        <p class="text-sm text-gray-500 font-semibold mt-2">Partition: <span id="modal-partition-number"></span></p>
-                        <p class="text-sm text-gray-500 flex items-center">Order ID: 
-                            <span id="modal-order-dot" class="inline-block w-4 h-4 rounded-sm mx-2 border"></span>
-                            <span id="modal-order-id" class="font-bold"></span>
-                        </p>
-                        <p class="text-sm text-gray-500 font-medium">SKU ID: <span id="modal-sku-id" class="font-mono"></span></p>
-                    </div>
-                    
-                    <div class="flex-grow flex flex-col">
-                        <div id="modal-compartment-view" class="bg-white rounded-lg aspect-square flex items-center justify-center p-3 border-2 transition-all">
-                        </div>
-                        <p class="text-xs text-center text-gray-500 mt-2 uppercase font-bold tracking-widest">Bin View</p>
-                    </div>
-
-                    <div id="modal-qty-container" class="border-2 rounded-lg p-4 text-center">
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">Pickup Quantity</p>
-                        <div class="flex items-center justify-center space-x-4 mt-1">
-                            <button id="modal-minus-btn" class="rounded-full w-10 h-10 flex items-center justify-center text-2xl font-bold bg-primary-darkest text-white hover:bg-black transition-colors">-</button>
-                            <p id="modal-quantity-counter" class="text-4xl font-black w-28"></p>
-                            <button id="modal-plus-btn" class="rounded-full w-10 h-10 flex items-center justify-center text-2xl font-bold bg-primary-darkest text-white hover:bg-black transition-colors">+</button>
-                        </div>
+                <div class="bg-slate-50 rounded-3xl p-8 text-center border-2 border-dashed border-slate-200">
+                    <p class="text-[10px] font-bold uppercase text-slate-400 tracking-[0.2em] mb-4">Required Quantity</p>
+                    <div class="flex items-center justify-center space-x-8">
+                        <button onclick="changeQty(-1)" class="w-16 h-16 bg-white shadow-md rounded-full text-3xl font-bold hover:bg-slate-100">-</button>
+                        <span id="pick-qty-display" class="text-8xl font-black text-slate-900 min-w-[120px]">1</span>
+                        <button onclick="changeQty(1)" class="w-16 h-16 bg-white shadow-md rounded-full text-3xl font-bold hover:bg-slate-100">+</button>
                     </div>
                 </div>
 
-                <!-- Center Cluster: SKU Image -->
-                <div class="flex flex-col items-center justify-center flex-grow">
-                    <div class="w-full max-w-sm text-center">
-                        <div class="relative bg-gray-100 rounded-3xl p-4 border-4 border-primary-dark">
-                             <div class="w-full aspect-square bg-primary-dark rounded-xl flex items-center justify-center">
-                                <span class="text-white text-4xl font-black uppercase tracking-widest">Widget</span>
-                             </div>
-                        </div>
-                        <p class="text-xs text-center text-gray-400 mt-4 font-bold uppercase tracking-widest">SKU Visual Reference</p>
-                    </div>
-                    <div class="mt-8">
-                        <svg class="w-20 h-20 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                        </svg>
-                    </div>
+                <button id="btn-cancel-pick" onclick="closeModals()" class="text-slate-400 font-bold hover:text-slate-600 uppercase text-sm">Cancel Transaction</button>
+            </div>
+
+            <div class="w-full md:w-[400px] p-12 bg-slate-50 flex flex-col items-center justify-center">
+                <h4 class="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mb-8">Target Put Wall Location</h4>
+                
+                <div id="put-wall-visual" class="grid grid-cols-2 grid-rows-2 gap-4 w-full aspect-square">
+                    <div id="vis-loc-1" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-2xl">1</div>
+                    <div id="vis-loc-2" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-2xl">2</div>
+                    <div id="vis-loc-3" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-2xl">3</div>
+                    <div id="vis-loc-4" class="border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-2xl">4</div>
                 </div>
 
-                <!-- Right Cluster: Put -->
-                <div class="flex flex-col space-y-6 w-80">
-                    <h2 class="text-2xl font-bold text-center text-primary-darkest">Put</h2>
-                    
-                    <div id="tote-map-container" class="flex-grow flex flex-col">
-                        <div class="flex-grow flex items-center justify-center">
-                            <div class="w-full">
-                                <div id="tote-map" class="grid grid-cols-2 grid-rows-2 gap-4 aspect-square w-full">
-                                    <div id="tote-1" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 1</div>
-                                    <div id="tote-2" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 2</div>
-                                    <div id="tote-3" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 3</div>
-                                    <div id="tote-4" class="order-tote border-2 border-gray-300 rounded-2xl flex items-center justify-center font-bold text-center p-2 text-xs transition-all">Loc 4</div>
-                                </div>
-                                <p class="text-[10px] font-bold text-center mt-3 uppercase tracking-widest text-gray-400">Put Wall Location</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-50 p-3 rounded-xl border-2 border-dashed border-gray-200 text-center">
-                        <span class="text-[10px] uppercase font-bold text-gray-400 block tracking-widest mb-1">Assigned Tote Barcode</span>
-                        <span id="modal-assigned-barcode" class="font-mono font-black text-xl text-primary-dark">---</span>
-                    </div>
-
-                    <div class="space-y-3">
-                         <button id="modal-done-btn" class="w-full text-center py-5 px-4 bg-gray-400 text-white font-black rounded-xl text-xl shadow-lg transition-all" disabled>CONFIRM PUT</button>
-                         <button onclick="closeModal()" class="w-full text-center py-2 text-gray-400 font-bold text-sm uppercase hover:text-gray-600">Cancel</button>
-                    </div>
+                <div class="mt-8 text-center">
+                    <p class="text-slate-400 text-xs font-bold uppercase mb-2">Target Tote</p>
+                    <p id="pick-target-tote" class="text-2xl font-black font-mono text-slate-800">---</p>
                 </div>
 
+                <button id="btn-confirm-put" class="mt-8 w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-xl shadow-xl transform transition-all active:scale-95">
+                    CONFIRM PUT
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Feedbacks -->
-    <div id="completion-animation" class="hidden fixed inset-0 bg-black/50 items-center justify-center z-[100] animation-popup">
-        <div class="text-white text-4xl font-black p-12 bg-green-500 rounded-3xl shadow-2xl" id="completion-text"></div>
-    </div>
-    <div id="batch-complete-animation" class="hidden fixed inset-0 bg-black/80 items-center justify-center z-[100] animation-popup">
-        <div class="text-white text-4xl font-black p-12 bg-blue-600 rounded-3xl shadow-2xl text-center">
-            Batch Complete!<br>
-            <span class="text-lg font-medium opacity-80 mt-2 block">Ready for next 4 totes...</span>
+    <div id="release-modal" class="hidden fixed inset-0 bg-green-500/90 flex items-center justify-center z-[150] p-4">
+        <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl p-12 text-center">
+            <div class="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">✓</div>
+            <h2 class="text-4xl font-black text-slate-900 mb-2">Order Complete!</h2>
+            <p id="release-order-id" class="text-2xl font-mono text-slate-500 mb-8"></p>
+            
+            <div class="bg-slate-50 rounded-2xl p-6 mb-8 text-left">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Physical Action Required:</p>
+                <p class="text-lg font-bold text-slate-700 leading-snug">Pull tote from Location <span id="release-loc-id" class="text-green-600"></span> and press the Green PTL Button.</p>
+            </div>
+
+            <button id="btn-confirm-release" class="w-full py-6 bg-green-600 text-white rounded-2xl font-black text-xl hover:bg-green-700 shadow-xl transition-all">
+                Confirm Order Tote Release
+            </button>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // DOM
-            const binsGrid = document.getElementById('bins-grid');
-            const mainModal = document.getElementById('pickup-modal');
-            const mappingModal = document.getElementById('mapping-modal');
-            const orderLegend = document.getElementById('order-legend');
-            const dateTimeElement = document.getElementById('date-time');
-            const mappingGrid = document.getElementById('mapping-grid');
-            const submitMappingBtn = document.getElementById('submit-mapping-btn');
+        // --- DATA & STATE ---
+        const PTL_COLORS = {
+            'LOC-1': 'bg-ptl-1',
+            'LOC-2': 'bg-ptl-2',
+            'LOC-3': 'bg-ptl-3',
+            'LOC-4': 'bg-ptl-4'
+        };
 
-            // State
-            let allOrdersInWave = []; 
-            let orderMetadata = {};   
-            let binData = [];         
-            let activeBatchOids = []; 
-            let totalBatches = 0;
-            let currentBatchIndex = 0;
+        let waveQueue = []; // Orders waiting to be presented (16 more)
+        let activeOrders = []; // The 4 orders currently on the UI
+        let wallSlots = {
+            'LOC-1': null, // { orderId: '...', toteId: '...' }
+            'LOC-2': null,
+            'LOC-3': null,
+            'LOC-4': null
+        };
 
-            // --- DATE ---
-            function updateDateTime() {
-                const now = new Date();
-                const options = { hour: '2-digit', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
-                dateTimeElement.textContent = now.toLocaleString('en-US', options);
-            }
-            setInterval(updateDateTime, 1000);
-            updateDateTime();
+        let bins = [];
+        let currentPick = null;
+        let ordersCompletedCount = 0;
 
-            // --- WAVE GENERATION ---
-            function generateWave() {
-                allOrdersInWave = [];
-                orderMetadata = {};
-                binData = [];
-                currentBatchIndex = 0;
-                
-                const waveSize = 10;
-                totalBatches = Math.ceil(waveSize / 4);
-                
-                const colors = ['order-1', 'order-2', 'order-3', 'order-4'];
-                for (let i = 0; i < waveSize; i++) {
-                    const oid = `ORD-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-                    allOrdersInWave.push(oid);
-                    orderMetadata[oid] = {
-                        id: oid,
-                        colorClass: colors[i % 4],
-                        items: 0,
-                        picked: 0,
-                        toteId: null,
-                        loc: null,
-                        completed: false
-                    };
-                }
-
-                // Generate 12 bins
-                const types = ['1-compartment', '2-compartment', '4-compartment', 'empty'];
-                for (let i = 1; i <= 12; i++) {
-                    const type = types[Math.floor(Math.random() * types.length)];
-                    const bin = { id: `${i}.1.1.`, type, items: [] };
-                    if (type !== 'empty') {
-                        const slots = type === '1-compartment' ? 1 : (type === '2-compartment' ? 2 : 4);
-                        for (let s = 0; s < slots; s++) {
-                            const targetOid = allOrdersInWave[Math.floor(Math.random() * allOrdersInWave.length)];
-                            bin.items.push({ compartment: s, orderId: targetOid });
-                            orderMetadata[targetOid].items++;
-                        }
-                    }
-                    binData.push(bin);
-                }
-
-                // BUG FIX: Ensure every order in the wave has AT LEAST ONE item
-                allOrdersInWave.forEach(oid => {
-                    if (orderMetadata[oid].items === 0) {
-                        // Pick a random bin that isn't empty and add it
-                        const nonEmptyBins = binData.filter(b => b.type !== 'empty');
-                        const randomBin = nonEmptyBins[Math.floor(Math.random() * nonEmptyBins.length)];
-                        const randomSlot = Math.floor(Math.random() * randomBin.items.length);
-                        
-                        // Replace an existing item slot with this order to guarantee it exists
-                        if (randomBin.items.length > 0) {
-                            randomBin.items[randomSlot].orderId = oid;
-                        } else {
-                            // If somehow empty, just force a 1-compartment change
-                            randomBin.type = '1-compartment';
-                            randomBin.items = [{ compartment: 0, orderId: oid }];
-                        }
-                        orderMetadata[oid].items = 1;
-                    }
-                });
-
-                startNextBatch();
-            }
-
-            // --- BATCH WORKFLOW ---
-            function startNextBatch() {
-                // Get next 4 orders that don't have a Tote ID yet
-                activeBatchOids = allOrdersInWave
-                    .filter(oid => !orderMetadata[oid].toteId)
-                    .slice(0, 4);
-
-                if (activeBatchOids.length === 0) {
-                    // Entire Wave Finished
-                    showAnimation('completion-animation', 'Wave Fully Archived');
-                    setTimeout(generateWave, 2500);
-                    return;
-                }
-
-                currentBatchIndex++;
-                showMappingModal();
-            }
-
-            function showMappingModal() {
-                mappingModal.classList.remove('hidden');
-                mappingGrid.innerHTML = '';
-                
-                document.getElementById('batch-counter').textContent = `Batch ${currentBatchIndex} of ${totalBatches}`;
-                document.getElementById('mapping-batch-info').textContent = `Batch progress: ${currentBatchIndex} of ${totalBatches} batches`;
-
-                activeBatchOids.forEach((oid, idx) => {
-                    const order = orderMetadata[oid];
-                    const card = document.createElement('div');
-                    card.className = `p-6 rounded-2xl border-4 bg-white flex flex-col items-center space-y-4 shadow-sm transition-all`;
-                    card.style.borderColor = `var(--${order.colorClass}-border)`;
-                    
-                    card.innerHTML = `
-                        <div class="flex items-center space-x-2">
-                             <div class="w-5 h-5 rounded ${order.colorClass} border-2 border-black/10"></div>
-                             <span class="font-black text-2xl tracking-tight">${oid}</span>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Put Wall Location</p>
-                            <p class="text-4xl font-black text-primary-dark">LOC ${idx + 1}</p>
-                        </div>
-                        <input type="text" placeholder="Scan Tote ID..." 
-                               class="mapping-input w-full p-4 rounded-xl border-2 border-gray-200 text-center font-mono font-bold focus:border-blue-500 focus:ring-8 focus:ring-blue-100 focus:outline-none uppercase text-xl"
-                               data-oid="${oid}" data-idx="${idx}">
-                    `;
-                    mappingGrid.appendChild(card);
-                });
-
-                const inputs = document.querySelectorAll('.mapping-input');
-                inputs.forEach((input, i) => {
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' && input.value.trim()) {
-                            if (inputs[i+1]) inputs[i+1].focus();
-                            else finalizeMapping();
-                        }
-                    });
-                });
-                setTimeout(() => inputs[0]?.focus(), 200);
-            }
-
-            function finalizeMapping() {
-                const inputs = document.querySelectorAll('.mapping-input');
-                let allValid = true;
-                inputs.forEach(input => {
-                    if (!input.value.trim()) allValid = false;
-                    const oid = input.dataset.oid;
-                    orderMetadata[oid].toteId = input.value.trim().toUpperCase();
-                    orderMetadata[oid].loc = parseInt(input.dataset.idx) + 1;
-                });
-
-                if (!allValid) return;
-
-                mappingModal.classList.add('hidden');
-                renderBins();
-                updateOrderLegend();
-                showAnimation('completion-animation', 'Totes Mapped. Start Picking.');
-            }
-
-            submitMappingBtn.onclick = finalizeMapping;
-
-            // --- RENDERING ---
-            function renderBins() {
-                binsGrid.innerHTML = '';
-                binData.forEach(bin => {
-                    const binEl = document.createElement('div');
-                    binEl.className = `bin-location bg-white p-1 flex flex-col aspect-[2/4] border-waiting shadow-sm transition-all`;
-                    
-                    if (bin.type === 'empty') {
-                        binEl.classList.add('bg-gray-50', 'border-transparent', 'opacity-50');
-                        binEl.innerHTML = `<div class="flex-grow"></div>`;
-                    } else {
-                        const gridClass = bin.type === '1-compartment' ? 'grid-cols-1 grid-rows-1' : (bin.type === '2-compartment' ? 'grid-cols-2 grid-rows-1' : 'grid-cols-2 grid-rows-2');
-                        let html = `<div class="flex-grow grid ${gridClass} gap-1">`;
-                        
-                        const slots = bin.type === '1-compartment' ? 1 : (bin.type === '2-compartment' ? 2 : 4);
-                        for (let s = 0; s < slots; s++) {
-                            const item = bin.items.find(i => i.compartment === s);
-                            if (item) {
-                                const order = orderMetadata[item.orderId];
-                                const isInBatch = activeBatchOids.includes(item.orderId);
-                                
-                                let stateClass = 'item-waiting';
-                                if (!isInBatch) stateClass = 'item-not-in-batch';
-                                
-                                // Check if this specific item slot in this bin was already picked
-                                const isItemFinished = item.isFinished || order.completed;
-                                if (isItemFinished) stateClass = 'item-finished';
-
-                                html += `<div class="selectable-item rounded-lg ${stateClass} ${isInBatch ? order.colorClass : ''}" 
-                                            data-oid="${item.orderId}" data-bin="${bin.id}" data-slot="${s}"
-                                            onclick="handleItemClick(this)">
-                                            <div class="icon-finished ${stateClass === 'item-finished' ? '' : 'hidden'}"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" /></svg></div>
-                                         </div>`;
-                            } else {
-                                html += `<div class="rounded-lg item-inactive"></div>`;
-                            }
-                        }
-                        html += `</div>`;
-                        binEl.innerHTML = html;
-                    }
-                    binEl.innerHTML += `<p class="text-[9px] font-black text-center text-gray-400 py-1 uppercase tracking-tighter">Bin Location:<br>${bin.id}</p>`;
-                    binsGrid.appendChild(binEl);
-                    updateBinBorder(binEl);
+        // --- INIT ---
+        function init() {
+            // Generate a wave of 20 orders
+            for(let i=0; i<20; i++) {
+                waveQueue.push({
+                    id: `ORD-${Math.random().toString(36).substring(7).toUpperCase()}`,
+                    itemsRequired: Math.floor(Math.random() * 3) + 1,
+                    itemsPicked: 0,
+                    mappedLoc: null,
+                    toteId: null
                 });
             }
-
-            function updateOrderLegend() {
-                orderLegend.innerHTML = '';
-                activeBatchOids.forEach(oid => {
-                    const order = orderMetadata[oid];
-                    const el = document.createElement('div');
-                    el.className = `flex-shrink-0 flex items-center space-x-3 px-4 py-2 bg-white rounded-xl border shadow-sm min-w-[160px]`;
-                    el.innerHTML = `
-                        <div class="w-4 h-4 rounded-sm ${order.colorClass} border border-black/10"></div>
-                        <div class="flex flex-col">
-                            <span class="text-[11px] font-black leading-none text-primary-darkest">${order.id}</span>
-                            <span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Lines: ${order.picked} of ${order.items}</span>
-                        </div>
-                    `;
-                    orderLegend.appendChild(el);
-                });
-            }
-
-            // --- PICKING LOGIC ---
-            let modalQty = 0;
-            let targetQty = 0;
-            let confirmedTote = false;
-            let currentItemNode = null;
-
-            window.handleItemClick = (node) => {
-                if (node.classList.contains('item-not-in-batch') || node.classList.contains('item-finished')) return;
-                
-                currentItemNode = node;
-                const oid = node.dataset.oid;
-                const order = orderMetadata[oid];
-
-                // If items is 1, target is 1. If more, random up to 8.
-                targetQty = order.items === 1 ? 1 : Math.floor(Math.random() * 8) + 1;
-                modalQty = targetQty; 
-                confirmedTote = false;
-                
-                document.getElementById('modal-item-name').textContent = `Industrial Widget ${Math.floor(Math.random()*999)}`;
-                document.getElementById('modal-order-id').textContent = oid;
-                document.getElementById('modal-order-dot').className = `inline-block w-4 h-4 rounded-sm mx-2 border ${order.colorClass}`;
-                document.getElementById('modal-sku-id').textContent = `SKU-${Math.random().toString(36).substring(7).toUpperCase()}`;
-                document.getElementById('modal-assigned-barcode').textContent = order.toteId;
-                
-                const binEl = node.closest('.bin-location');
-                const allSlots = Array.from(binEl.querySelectorAll('.selectable-item, .item-inactive, .rounded-lg:not(.selectable-item)'));
-                document.getElementById('modal-partition-number').textContent = allSlots.indexOf(node) + 1;
-
-                // Mini View
-                const miniView = document.getElementById('modal-compartment-view');
-                miniView.style.borderColor = `var(--${order.colorClass}-border)`;
-                miniView.innerHTML = binEl.querySelector('.grid').outerHTML;
-                
-                const gridNode = miniView.querySelector('.grid');
-                gridNode.classList.remove('gap-1');
-                gridNode.classList.add('gap-2', 'h-full', 'w-full');
-
-                const miniSlots = gridNode.children;
-                Array.from(miniSlots).forEach((cl, i) => {
-                    const originalSlot = allSlots[i];
-                    if (originalSlot === node) {
-                        cl.className = `rounded-lg flex items-center justify-center transition-all modal-active-compartment ${order.colorClass}`;
-                        cl.innerHTML = "";
-                    } else {
-                        cl.className = `rounded-lg bg-white border border-gray-100`;
-                        cl.innerHTML = "";
-                    }
-                });
-
-                // Tote Wall
-                const totes = document.querySelectorAll('.order-tote');
-                totes.forEach((t, i) => {
-                    const locId = i + 1;
-                    const assignedBatchOrder = activeBatchOids.find(boid => orderMetadata[boid].loc === locId);
-                    
-                    t.className = 'order-tote border-2 border-gray-300 rounded-2xl flex flex-col items-center justify-center font-bold text-center p-2 text-[10px] transition-all cursor-pointer';
-                    t.innerHTML = `<span class="opacity-40 uppercase text-[7px] mb-1 font-bold">Loc ${locId}</span>`;
-
-                    if (assignedBatchOrder) {
-                        const o = orderMetadata[assignedBatchOrder];
-                        t.classList.add(o.colorClass);
-                        t.innerHTML += `<span class="text-xs font-black tracking-tight">${o.toteId}</span>`;
-                        if (o.id === oid) t.classList.add('tote-highlight');
-                    } else {
-                        t.innerHTML += `<span class="opacity-20 font-bold">EMPTY</span>`;
-                    }
-
-                    t.onclick = () => {
-                        if (assignedBatchOrder === oid) {
-                            confirmedTote = !confirmedTote;
-                            t.classList.toggle('tote-confirmed', confirmedTote);
-                            updateModalButtons();
-                        }
-                    };
-                });
-
-                updateCounterDisplay();
-                mainModal.classList.remove('hidden');
-                node.classList.add('item-selected');
-                updateBinBorder(binEl);
-            };
-
-            function updateCounterDisplay() {
-                document.getElementById('modal-quantity-counter').textContent = `${modalQty}/${targetQty}`;
-                updateModalButtons();
-            }
-
-            function updateModalButtons() {
-                const btn = document.getElementById('modal-done-btn');
-                const ready = modalQty === targetQty && confirmedTote;
-                btn.disabled = !ready;
-                btn.className = ready 
-                    ? "w-full py-5 bg-green-500 text-white font-black rounded-xl text-xl shadow-lg hover:bg-green-600 transition-all scale-105" 
-                    : "w-full py-5 bg-gray-400 text-white font-black rounded-xl text-xl transition-all";
-            }
-
-            document.getElementById('modal-plus-btn').onclick = () => { if(modalQty < targetQty + 5) { modalQty++; updateCounterDisplay(); } };
-            document.getElementById('modal-minus-btn').onclick = () => { if(modalQty > 0) { modalQty--; updateCounterDisplay(); } };
             
-            document.getElementById('modal-done-btn').onclick = () => {
-                const oid = currentItemNode.dataset.oid;
-                const order = orderMetadata[oid];
-                const binId = currentItemNode.dataset.bin;
-                const slotIndex = parseInt(currentItemNode.dataset.slot);
+            // Push first 4 to active
+            refreshActiveOrders();
+            generateBins();
+            renderAll();
+            startClock();
+        }
 
-                order.picked++;
+        function refreshActiveOrders() {
+            while (activeOrders.length < 4 && waveQueue.length > 0) {
+                activeOrders.push(waveQueue.shift());
+            }
+        }
 
-                // Mark the logical item in binData as finished
-                const bin = binData.find(b => b.id === binId);
-                const itemEntry = bin.items.find(i => i.compartment === slotIndex);
-                itemEntry.isFinished = true;
+        function generateBins() {
+            bins = [];
+            for(let i=1; i<=12; i++) {
+                // Each bin contains 1 item for one of the active orders
+                const order = activeOrders[Math.floor(Math.random() * activeOrders.length)];
+                bins.push({
+                    id: `${Math.floor(Math.random()*9+1)}.${Math.floor(Math.random()*5+1)}`,
+                    orderId: order.id,
+                    skuName: ['Industrial Widget', 'Heavy Duty Bolt', 'Silicon Gasket', 'Metal Bracket'][Math.floor(Math.random()*4)],
+                    skuId: `SKU-${Math.random().toString(36).substring(9).toUpperCase()}`,
+                    isPicked: false
+                });
+            }
+        }
 
-                currentItemNode.classList.remove('item-selected', 'item-waiting');
-                currentItemNode.classList.add('item-finished');
-                currentItemNode.querySelector('.icon-finished').classList.remove('hidden');
+        // --- RENDERING ---
+        function renderAll() {
+            renderPutWall();
+            renderBinGrid();
+            document.getElementById('wave-progress').textContent = `${ordersCompletedCount} / 20 Orders`;
+        }
 
-                if (order.picked >= order.items) {
-                    order.completed = true;
-                    showAnimation('completion-animation', `${oid} Completed!`);
-                }
-
-                closeModal();
-                updateOrderLegend();
-                checkBatchCompletion();
-            };
-
-            window.closeModal = () => {
-                if (currentItemNode) {
-                    currentItemNode.classList.remove('item-selected');
-                    updateBinBorder(currentItemNode.closest('.bin-location'));
-                }
-                mainModal.classList.add('hidden');
-            };
-
-            function updateBinBorder(binEl) {
-                if (binEl.classList.contains('opacity-50')) return;
-                const selected = binEl.querySelector('.item-selected');
-                const finished = binEl.querySelectorAll('.item-finished').length;
-                const total = binEl.querySelectorAll('.selectable-item').length;
-
-                binEl.classList.remove('border-waiting', 'border-finished');
-                if (selected) {
-                    const order = orderMetadata[selected.dataset.oid];
-                    binEl.style.borderColor = `var(--${order.colorClass}-border)`;
-                } else if (finished > 0 && finished === total) {
-                    binEl.classList.add('border-finished');
+        function renderPutWall() {
+            const container = document.getElementById('put-wall-monitor');
+            container.innerHTML = '';
+            
+            ['LOC-1', 'LOC-2', 'LOC-3', 'LOC-4'].forEach((loc, idx) => {
+                const data = wallSlots[loc];
+                const el = document.createElement('div');
+                el.className = `w-32 h-14 rounded-xl border-2 flex items-center px-3 space-x-2 transition-all ${data ? PTL_COLORS[loc] + ' border-transparent shadow-lg' : 'border-slate-200 bg-white opacity-40'}`;
+                
+                if(data) {
+                    el.innerHTML = `
+                        <div class="flex-grow">
+                            <p class="text-[8px] font-black text-white/60 uppercase">Loc ${idx+1}</p>
+                            <p class="text-[10px] font-bold text-white truncate">${data.orderId}</p>
+                        </div>
+                        <div class="text-[10px] bg-white/20 text-white rounded px-1 font-mono">${activeOrders.find(o => o.id === data.orderId).itemsPicked}/${activeOrders.find(o => o.id === data.orderId).itemsRequired}</div>
+                    `;
                 } else {
-                    binEl.classList.add('border-waiting');
+                    el.innerHTML = `<p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest w-full text-center">Empty</p>`;
                 }
-            }
+                container.appendChild(el);
+            });
+        }
 
-            function checkBatchCompletion() {
-                // Check if all orders in the current active batch are completed
-                const batchDone = activeBatchOids.every(oid => orderMetadata[oid].completed);
-                if (batchDone) {
-                    showAnimation('batch-complete-animation');
-                    // Automatically proceed to the next mapping batch
-                    setTimeout(startNextBatch, 2500);
+        function renderBinGrid() {
+            const grid = document.getElementById('bin-grid');
+            grid.innerHTML = '';
+
+            bins.forEach((bin, idx) => {
+                const order = activeOrders.find(o => o.id === bin.orderId);
+                const isMapped = order && order.mappedLoc;
+                const ptlColorClass = isMapped ? PTL_COLORS[order.mappedLoc] : 'item-unmapped';
+                
+                const el = document.createElement('div');
+                el.className = `p-4 rounded-2xl h-40 flex flex-col justify-between transition-all relative ${bin.isPicked ? 'item-finished' : 'item-active ' + ptlColorClass}`;
+                
+                el.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <span class="text-[10px] font-black text-black/30 uppercase font-mono">${bin.id}</span>
+                        ${isMapped ? `<span class="bg-black/10 text-black/60 px-2 py-0.5 rounded text-[9px] font-bold">${order.mappedLoc}</span>` : ''}
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold leading-tight ${isMapped ? 'text-white' : 'text-slate-400'}">${bin.skuName}</p>
+                        <p class="text-[9px] font-mono mt-1 ${isMapped ? 'text-white/60' : 'text-slate-300'}">${bin.orderId}</p>
+                    </div>
+                `;
+
+                if(!bin.isPicked) {
+                    el.onclick = () => handleBinClick(bin, idx);
                 }
+                grid.appendChild(el);
+            });
+        }
+
+        // --- WORKFLOW LOGIC ---
+        function handleBinClick(bin, index) {
+            const order = activeOrders.find(o => o.id === bin.orderId);
+            currentPick = { bin, index, order };
+
+            if (!order.mappedLoc) {
+                openMappingModal(order);
+            } else {
+                openPickPutModal();
+            }
+        }
+
+        function openMappingModal(order) {
+            document.getElementById('mapping-order-id').textContent = order.id;
+            document.getElementById('mapping-modal').classList.remove('hidden');
+            document.getElementById('input-loc').value = '';
+            document.getElementById('input-tote').value = '';
+            document.getElementById('input-loc').focus();
+        }
+
+        document.getElementById('btn-confirm-mapping').onclick = () => {
+            const locInput = document.getElementById('input-loc').value.toUpperCase();
+            const toteInput = document.getElementById('input-tote').value.trim();
+
+            if (!PTL_COLORS[locInput]) {
+                alert("Invalid Location. Use LOC-1, LOC-2, LOC-3, or LOC-4");
+                return;
+            }
+            if (wallSlots[locInput]) {
+                alert("Location already occupied!");
+                return;
+            }
+            if (!toteInput) {
+                alert("Please scan a Tote ID");
+                return;
             }
 
-            function showAnimation(id, text) {
-                const el = document.getElementById(id);
-                if (text) el.querySelector('div').textContent = text;
-                el.classList.add('show');
-                el.classList.remove('hidden');
-                setTimeout(() => {
-                    el.classList.remove('show');
-                    el.classList.add('hidden');
-                }, 2400);
-            }
+            // Map it
+            currentPick.order.mappedLoc = locInput;
+            currentPick.order.toteId = toteInput;
+            wallSlots[locInput] = { orderId: currentPick.order.id, toteId: toteInput };
 
-            generateWave();
-        });
+            document.getElementById('mapping-modal').classList.add('hidden');
+            renderAll();
+            openPickPutModal(); // Proceed to pick after mapping
+        };
+
+        function openPickPutModal() {
+            const { bin, order } = currentPick;
+            document.getElementById('pick-bin-id').textContent = bin.id;
+            document.getElementById('pick-sku-name').textContent = bin.skuName;
+            document.getElementById('pick-sku-id').textContent = bin.skuId;
+            document.getElementById('pick-target-tote').textContent = order.toteId;
+            document.getElementById('pick-qty-display').textContent = '1';
+
+            // Reset Wall Visual
+            for(let i=1; i<=4; i++) {
+                const el = document.getElementById(`vis-loc-${i}`);
+                el.className = 'border-4 border-slate-200 rounded-3xl flex items-center justify-center text-slate-300 font-black text-2xl';
+            }
+            // Highlight Target
+            const targetNum = order.mappedLoc.split('-')[1];
+            const targetEl = document.getElementById(`vis-loc-${targetNum}`);
+            targetEl.className = `border-8 rounded-3xl flex items-center justify-center text-white font-black text-4xl shadow-2xl border-white ${PTL_COLORS[order.mappedLoc]}`;
+
+            document.getElementById('pick-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('btn-confirm-put').onclick = () => {
+            const { bin, order, index } = currentPick;
+            
+            bin.isPicked = true;
+            order.itemsPicked++;
+
+            document.getElementById('pick-modal').classList.add('hidden');
+            
+            if (order.itemsPicked >= order.itemsRequired) {
+                openReleaseModal(order);
+            } else {
+                renderAll();
+            }
+        };
+
+        function openReleaseModal(order) {
+            document.getElementById('release-order-id').textContent = order.id;
+            document.getElementById('release-loc-id').textContent = order.mappedLoc.split('-')[1];
+            document.getElementById('release-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('btn-confirm-release').onclick = () => {
+            const order = currentPick.order;
+            
+            // 1. Clear Slot
+            wallSlots[order.mappedLoc] = null;
+            
+            // 2. Remove from Active Orders
+            activeOrders = activeOrders.filter(o => o.id !== order.id);
+            ordersCompletedCount++;
+
+            // 3. Pull next if available
+            refreshActiveOrders();
+            
+            // 4. Update Bin Grid for new order presentation
+            generateBins(); 
+
+            document.getElementById('release-modal').classList.add('hidden');
+            renderAll();
+        };
+
+        // --- UTILS ---
+        function changeQty(amt) {
+            const el = document.getElementById('pick-qty-display');
+            let val = parseInt(el.textContent) + amt;
+            if (val < 1) val = 1;
+            el.textContent = val;
+        }
+
+        function closeModals() {
+            document.querySelectorAll('#mapping-modal, #pick-modal, #release-modal').forEach(m => m.classList.add('hidden'));
+        }
+
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }, 1000);
+        }
+
+        init();
     </script>
 </body>
 </html>
